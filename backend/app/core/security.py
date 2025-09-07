@@ -22,7 +22,7 @@ from webauthn.helpers.structs import (
 
 from app.core.config import settings
 from app.core.database import get_db
-from app.models.user import User
+from backend.app.models.profile import User
 from app.repositories.user_repository import UserRepository
 
 # Password hashing

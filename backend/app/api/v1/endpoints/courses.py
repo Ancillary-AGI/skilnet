@@ -11,7 +11,7 @@ from datetime import datetime
 
 from app.core.database import get_db
 from app.core.security import get_current_active_user
-from app.models.user import User
+from backend.app.models.profile import User
 from app.models.course import Course, CourseModule, Lesson, Enrollment, LessonProgress, CourseReview
 from app.repositories.course_repository import CourseRepository
 from app.schemas.course import (

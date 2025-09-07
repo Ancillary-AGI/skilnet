@@ -11,7 +11,7 @@ import json
 
 from app.main import app
 from app.core.database import get_db
-from app.models.user import User
+from backend.app.models.profile import User
 from app.core.security import SecurityManager
 from tests.conftest import TestDatabase
 

@@ -2,7 +2,7 @@
 WebSocket connection manager for real-time features
 """
 
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Any
 from fastapi import WebSocket
 import json
 import logging
@@ -59,7 +59,7 @@ class WebSocketManager:
     
     def disconnect(self, websocket: WebSocket, room_id: str, user_id: str):
         """Disconnect user from room"""
-        # Remove from connections
+        # Remove connection from room
         if room_id in self.active_connections:
             if websocket in self.active_connections[room_id]:
                 self.active_connections[room_id].remove(websocket)
@@ -103,7 +103,7 @@ class WebSocketManager:
     async def broadcast_to_room(
         self, 
         room_id: str, 
-        message: any, 
+        message: Any, 
         exclude_user: str = None
     ):
         """Broadcast message to all users in a room"""
@@ -143,7 +143,7 @@ class WebSocketManager:
             if connection in self.connection_metadata:
                 del self.connection_metadata[connection]
     
-    async def broadcast_to_all_rooms(self, message: any):
+    async def broadcast_to_all_rooms(self, message: Any):
         """Broadcast message to all active rooms"""
         for room_id in self.active_connections:
             await self.broadcast_to_room(room_id, message)
@@ -156,7 +156,7 @@ class WebSocketManager:
         """Get list of active rooms"""
         return list(self.active_connections.keys())
     
-    def get_connection_stats(self) -> Dict[str, any]:
+    def get_connection_stats(self) -> Dict[str, Any]:
         """Get connection statistics"""
         total_connections = sum(len(connections) for connections in self.active_connections.values())
         

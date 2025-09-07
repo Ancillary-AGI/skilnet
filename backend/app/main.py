@@ -3,13 +3,15 @@ EduVerse - Advanced E-Learning Platform
 Main FastAPI application with comprehensive features
 """
 
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, OAuth2PasswordBearer
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
 from contextlib import asynccontextmanager
 import logging
-from typing import List
+from typing import List, Optional
+from datetime import datetime, timedelta
+import os
 
 from app.core.config import settings
 from app.core.database import engine, Base
@@ -17,7 +19,11 @@ from app.core.security import get_current_user
 from app.api.v1 import auth, courses, users, ai_teaching, vr_classroom, analytics
 from app.services.websocket_manager import WebSocketManager
 from app.services.ai_video_generator import AIVideoGenerator
-from app.models.user import User
+from backend.app.models.profile import User
+import jwt
+
+from backend.app.core.database import DatabaseConfig, DatabaseConnection, BaseModel
+from backend.app.models.profile import User
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -60,8 +66,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Security configuration
+SECRET_KEY = "your-secret-key"
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
 # Security middleware
 security = HTTPBearer()
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # CORS middleware
 app.add_middleware(
@@ -86,6 +99,60 @@ app.include_router(ai_teaching.router, prefix="/api/v1/ai", tags=["AI Teaching"]
 app.include_router(vr_classroom.router, prefix="/api/v1/vr", tags=["VR Classroom"])
 app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
 
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid authentication credentials",
+            )
+        users = await BaseUser.filter(username=username)
+        if not users:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User not found",
+            )
+        return users[0]
+    except jwt.PyJWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+# Database initialization
+@app.on_event("startup")
+async def startup():
+    # Use SQLite for testing, PostgreSQL for production
+    database_url = os.getenv('DATABASE_URL', 'sqlite:///database.db')
+    config = DatabaseConfig(database_url)
+    
+    # Set config for all models
+    BaseModel.set_db_config(config)
+    
+    # Initialize database connection
+    db = DatabaseConnection.get_instance(config)
+    await db.connect()
+    
+    # Create tables
+    ...
+
+@app.on_event("shutdown")
+async def shutdown():
+    db = DatabaseConnection.get_instance()
+    await db.disconnect()
 
 @app.get("/")
 async def root():
