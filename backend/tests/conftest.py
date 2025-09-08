@@ -11,8 +11,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.pool import StaticPool
 
 from app.main import app
-from app.core.database import get_db, Base
+from app.core.database import get_db
 from app.core.config import settings
+from sqlmodel import SQLModel
 
 # Test database URL
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
@@ -35,24 +36,24 @@ TestSessionLocal = async_sessionmaker(
 
 class TestDatabase:
     """Test database management"""
-    
+
     @staticmethod
     async def create_tables():
         """Create all database tables"""
         async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-    
+            await conn.run_sync(SQLModel.metadata.create_all)
+
     @staticmethod
     async def drop_tables():
         """Drop all database tables"""
         async with test_engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-    
+            await conn.run_sync(SQLModel.metadata.drop_all)
+
     @staticmethod
     async def clear_tables():
         """Clear all data from tables"""
         async with test_engine.begin() as conn:
-            for table in reversed(Base.metadata.sorted_tables):
+            for table in reversed(SQLModel.metadata.sorted_tables):
                 await conn.execute(table.delete())
 
 

@@ -8,7 +8,6 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
 import secrets
 import base64
 from webauthn import generate_registration_options, verify_registration_response
@@ -23,13 +22,13 @@ from webauthn.helpers.structs import (
 from app.core.config import settings
 from app.core.database import get_db
 from backend.app.models.profile import User
-from app.repositories.user_repository import UserRepository
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT Security
 security = HTTPBearer()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 # WebAuthn configuration
 RP_ID = "eduverse.com"
@@ -79,6 +78,10 @@ class SecurityManager:
             return payload
         except JWTError:
             return None
+    
+    @staticmethod
+    def generate_api_key() -> str:
+        return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
     
     @staticmethod
     def generate_registration_options_webauthn(user_id: str, username: str):
@@ -132,7 +135,6 @@ class SecurityManager:
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current authenticated user"""
     credentials_exception = HTTPException(
@@ -143,22 +145,21 @@ async def get_current_user(
     
     try:
         payload = SecurityManager.verify_token(credentials.credentials)
-        if payload is None:
+        if not payload:
             raise credentials_exception
         
         user_id: str = payload.get("sub")
-        if user_id is None:
+        if not user_id:
             raise credentials_exception
             
     except JWTError:
         raise credentials_exception
     
-    user_repo = UserRepository(db)
-    user = await user_repo.get_by_id(user_id)
-    if user is None:
+    users = await User.filter(id=user_id)
+    if not users:
         raise credentials_exception
     
-    return user
+    return users[0]
 
 
 async def get_current_active_user(current_user: User = Depends(get_current_user)) -> User:
@@ -168,6 +169,10 @@ async def get_current_active_user(current_user: User = Depends(get_current_user)
     return current_user
 
 
-def generate_api_key() -> str:
-    """Generate secure API key"""
-    return base64.urlsafe_b64encode(secrets.token_bytes(32)).decode()
+async def get_current_admin_user(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    """Get current admin user"""
+    if not current_user.role == "admin":
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return current_user

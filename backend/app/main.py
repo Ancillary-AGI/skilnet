@@ -3,58 +3,52 @@ EduVerse - Advanced E-Learning Platform
 Main FastAPI application with comprehensive features
 """
 
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, OAuth2PasswordBearer
+from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, OAuth2PasswordBearer, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.security import HTTPBearer
 from contextlib import asynccontextmanager
 import logging
 from typing import List, Optional
+from app.core.config import settings
 from datetime import datetime, timedelta
 import os
-
-from app.core.config import settings
-from app.core.database import engine, Base
-from app.core.security import get_current_user
-from app.api.v1 import auth, courses, users, ai_teaching, vr_classroom, analytics
-from app.services.websocket_manager import WebSocketManager
-from app.services.ai_video_generator import AIVideoGenerator
-from backend.app.models.profile import User
 import jwt
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.database import DatabaseConfig, DatabaseConnection, BaseModel
-from backend.app.models.profile import User
+from app.core.database import create_tables, get_db
+from app.core.security import get_current_user
+from app.core.logging import get_logger, log_request_middleware
+from app.middleware.i18n_middleware import I18nMiddleware
+from app.models.user import User
+from app.api.v1.endpoints import auth, translations
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Configure advanced logging
+logger = get_logger(__name__)
 
-# WebSocket manager for real-time features
-websocket_manager = WebSocketManager()
+# Security configuration
+SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
-# AI Video Generator
-ai_video_generator = AIVideoGenerator()
-
+# OAuth2 scheme
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
     # Startup
     logger.info("Starting EduVerse platform...")
-    
+
     # Create database tables
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
-    
-    # Initialize AI models
-    await ai_video_generator.initialize_models()
-    
+    await create_tables()
+
+    logger.info("Database tables created successfully")
+
     yield
-    
+
     # Shutdown
     logger.info("Shutting down EduVerse platform...")
-    await ai_video_generator.cleanup()
-
 
 # Create FastAPI app
 app = FastAPI(
@@ -63,96 +57,74 @@ app = FastAPI(
     version="1.0.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
-    lifespan=lifespan
+    lifespan=lifespan,
+    openapi_url="/api/v1/openapi.json"
 )
-
-# Security configuration
-SECRET_KEY = "your-secret-key"
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# Security middleware
-security = HTTPBearer()
-
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_HOSTS,
+    allow_origins=["*"],  # Configure properly for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Trusted host middleware
-app.add_middleware(
-    TrustedHostMiddleware,
-    allowed_hosts=settings.ALLOWED_HOSTS
-)
+# Trusted host middleware (configure for production)
+if not settings.DEBUG:
+    app.add_middleware(
+        TrustedHostMiddleware,
+        allowed_hosts=settings.ALLOWED_HOSTS
+    )
+
+# I18n middleware for multilanguage support
+app.add_middleware(I18nMiddleware, default_language=settings.DEFAULT_LANGUAGE)
 
 # Include API routers
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-app.include_router(courses.router, prefix="/api/v1/courses", tags=["Courses"])
-app.include_router(ai_teaching.router, prefix="/api/v1/ai", tags=["AI Teaching"])
-app.include_router(vr_classroom.router, prefix="/api/v1/vr", tags=["VR Classroom"])
-app.include_router(analytics.router, prefix="/api/v1/analytics", tags=["Analytics"])
-
+app.include_router(translations.router, prefix="/api/v1/translations", tags=["Translations"])
+# TODO: Add other routers as they are refactored
+# app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
+# app.include_router(courses.router, prefix="/api/v1/courses", tags=["Courses"])
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
+    """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user_from_token(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Get current user from JWT token"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate credentials",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid authentication credentials",
-            )
-        users = await BaseUser.filter(username=username)
-        if not users:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="User not found",
-            )
-        return users[0]
+            raise credentials_exception
     except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token",
-        )
+        raise credentials_exception
 
-# Database initialization
-@app.on_event("startup")
-async def startup():
-    # Use SQLite for testing, PostgreSQL for production
-    database_url = os.getenv('DATABASE_URL', 'sqlite:///database.db')
-    config = DatabaseConfig(database_url)
-    
-    # Set config for all models
-    BaseModel.set_db_config(config)
-    
-    # Initialize database connection
-    db = DatabaseConnection.get_instance(config)
-    await db.connect()
-    
-    # Create tables
-    ...
+    # Query user from database
+    from sqlmodel import select
+    result = await db.execute(select(User).where(User.username == username))
+    user = result.scalar_one_or_none()
 
-@app.on_event("shutdown")
-async def shutdown():
-    db = DatabaseConnection.get_instance()
-    await db.disconnect()
+    if user is None:
+        raise credentials_exception
+
+    return user
 
 @app.get("/")
 async def root():
@@ -163,48 +135,30 @@ async def root():
         "status": "operational"
     }
 
+@app.get("/health")
+async def health_check():
+    """Detailed health check"""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat(),
+        "service": "EduVerse API"
+    }
 
-@app.websocket("/ws/classroom/{room_id}")
-async def websocket_classroom(
-    websocket: WebSocket,
-    room_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """WebSocket endpoint for real-time classroom interactions"""
-    await websocket_manager.connect(websocket, room_id, current_user.id)
-    try:
-        while True:
-            data = await websocket.receive_text()
-            await websocket_manager.broadcast_to_room(room_id, data, current_user.id)
-    except WebSocketDisconnect:
-        websocket_manager.disconnect(websocket, room_id, current_user.id)
-
-
-@app.websocket("/ws/ai-class/{class_id}")
-async def websocket_ai_class(
-    websocket: WebSocket,
-    class_id: str,
-    current_user: User = Depends(get_current_user)
-):
-    """WebSocket endpoint for AI-powered live classes"""
-    await websocket_manager.connect(websocket, f"ai_class_{class_id}", current_user.id)
-    try:
-        # Start AI video generation for live class
-        await ai_video_generator.start_live_session(class_id, websocket)
-        
-        while True:
-            data = await websocket.receive_text()
-            # Process student input and generate AI response
-            await ai_video_generator.process_student_input(class_id, data, websocket)
-    except WebSocketDisconnect:
-        websocket_manager.disconnect(websocket, f"ai_class_{class_id}", current_user.id)
-        await ai_video_generator.end_live_session(class_id)
-
+# WebSocket endpoints (commented out until services are refactored)
+# @app.websocket("/ws/classroom/{room_id}")
+# async def websocket_classroom(
+#     websocket: WebSocket,
+#     room_id: str,
+#     current_user: User = Depends(get_current_user_from_token)
+# ):
+#     """WebSocket endpoint for real-time classroom interactions"""
+#     # TODO: Implement WebSocket manager with SQLModel
+#     pass
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(
-        "app.main:app",
+        "main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

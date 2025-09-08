@@ -17,20 +17,15 @@ class Settings(BaseSettings):
     API_V1_STR: str = "/api/v1"
     
     # Database
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./test.db")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite:///./database.db")
     DATABASE_POOL_SIZE: int = 20
     DATABASE_MAX_OVERFLOW: int = 10
-    
+
     # Security
     SECRET_KEY: str = os.getenv("SECRET_KEY", "change-this-in-production")
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 60 * 24 * 7  # 7 days
-    
-    # Database
-    DATABASE_URL: str
-    DATABASE_POOL_SIZE: int = 10
-    DATABASE_MAX_OVERFLOW: int = 20
     
     # Redis
     REDIS_URL: str = "redis://localhost:6379"
@@ -89,7 +84,15 @@ class Settings(BaseSettings):
     # Rate Limiting
     RATE_LIMIT_PER_MINUTE: int = 60
     RATE_LIMIT_BURST: int = 100
-    
+
+    # Internationalization
+    DEFAULT_LANGUAGE: str = "en"
+    SUPPORTED_LANGUAGES: List[str] = [
+        "en", "es", "fr", "de", "zh", "ja", "ko", "ar", "hi", "pt", "ru",
+        "sw", "am", "yo", "ig", "ha"
+    ]
+    TRANSLATIONS_DIR: str = "./app/translations"
+
     class Config:
         env_file = ".env"
         case_sensitive = True

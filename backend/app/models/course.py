@@ -1,6 +1,8 @@
-from .base_model import BaseModel, Relationship, RelationshipType
-from ..core.database import Field
+import uuid
+from datetime import datetime
+from typing import Optional, List, Dict, Any
 from enum import Enum
+from sqlmodel import SQLModel, Field
 
 class DifficultyLevel(str, Enum):
     BEGINNER = "beginner"
@@ -28,154 +30,233 @@ class CourseStatus(str, Enum):
     ARCHIVED = "archived"
     UNDER_REVIEW = "under_review"
 
-class Course(BaseModel):
-    _table_name = "courses"
-    _columns = {
-        'id': Field('TEXT', primary_key=True, default=lambda: str(uuid.uuid4())),
-        'title': Field('TEXT', nullable=False),
-        'slug': Field('TEXT', unique=True, nullable=False, index=True),
-        'description': Field('TEXT'),
-        'short_description': Field('TEXT'),
-        'instructor_id': Field('TEXT', nullable=False, index=True),
-        'category': Field('TEXT', index=True),
-        'subcategory': Field('TEXT', index=True),
-        'tags': Field('JSON', default=[]),
-        'language': Field('TEXT', default="en"),
-        'difficulty_level': Field('TEXT', default=DifficultyLevel.BEGINNER),
-        'estimated_duration_hours': Field('REAL', default=0.0),
-        'price': Field('REAL', default=0.0),
-        'currency': Field('TEXT', default='USD'),
-        'thumbnail_url': Field('TEXT'),
-        'trailer_video_url': Field('TEXT'),
-        'course_materials': Field('JSON', default=[]),
-        'vr_environment_id': Field('TEXT'),
-        'ar_markers': Field('JSON', default=[]),
-        'spatial_audio_enabled': Field('BOOLEAN', default=False),
-        'haptic_feedback_enabled': Field('BOOLEAN', default=False),
-        'ai_tutor_enabled': Field('BOOLEAN', default=False),
-        'ai_difficulty_adaptation': Field('BOOLEAN', default=False),
-        'ai_content_generation': Field('BOOLEAN', default=False),
-        'status': Field('TEXT', default=CourseStatus.DRAFT),
-        'is_featured': Field('BOOLEAN', default=False),
-        'enrollment_count': Field('INTEGER', default=0),
-        'average_rating': Field('REAL', default=0.0),
-        'total_reviews': Field('INTEGER', default=0),
-        'completion_rate': Field('REAL', default=0.0),
-        'learning_objectives': Field('JSON', default=[]),
-        'prerequisites': Field('JSON', default=[]),
-        'skills_gained': Field('JSON', default=[]),
-        'certificate_enabled': Field('BOOLEAN', default=False),
-        'certificate_template_id': Field('TEXT'),
-        'ar_content_id': Field('TEXT'),
-        'created_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'updated_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'published_at': Field('TIMESTAMP')
-    }
-    
-    # Relationships
-    _relationships = {
-        'category': Relationship(
-            model_class='Category',
-            relationship_type=RelationshipType.MANY_TO_ONE,
-            foreign_key='category_id',
-            local_key='id'
-        ),
-    }
+class Course(SQLModel, table=True):
+    __tablename__ = "courses"
 
-class Lesson(BaseModel):
-    _table_name = "lessons"
-    _columns = {
-        'id': Field('TEXT', primary_key=True, default=lambda: str(uuid.uuid4())),
-        'module_id': Field('TEXT', nullable=False, index=True),
-        'title': Field('TEXT', nullable=False),
-        'description': Field('TEXT'),
-        'content_type': Field('TEXT', nullable=False),
-        'order_index': Field('INTEGER', nullable=False),
-        'video_url': Field('TEXT'),
-        'text_content': Field('TEXT'),
-        'interactive_content': Field('JSON'),
-        'vr_scene_url': Field('TEXT'),
-        'ar_model_url': Field('TEXT'),
-        'spatial_audio_url': Field('TEXT'),
-        'haptic_patterns': Field('JSON'),
-        'ai_generated': Field('BOOLEAN', default=False),
-        'ai_model_version': Field('TEXT'),
-        'ai_generation_prompt': Field('TEXT'),
-        'duration_minutes': Field('INTEGER'),
-        'is_free': Field('BOOLEAN', default=False),
-        'requires_vr': Field('BOOLEAN', default=False),
-        'requires_ar': Field('BOOLEAN', default=False),
-        'has_quiz': Field('BOOLEAN', default=False),
-        'quiz_questions': Field('JSON', default=[]),
-        'passing_score': Field('REAL', default=70.0),
-        'created_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'updated_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP')
-    }
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    title: str = Field(nullable=False)
+    slug: str = Field(unique=True, index=True, nullable=False)
+    description: Optional[str] = Field(default=None)
+    short_description: Optional[str] = Field(default=None)
+    instructor_id: str = Field(index=True, nullable=False)
+    category: Optional[str] = Field(default=None, index=True)
+    subcategory: Optional[str] = Field(default=None, index=True)
+    tags: List[str] = Field(default_factory=list)
+    language: str = Field(default="en")
+    difficulty_level: str = Field(default=DifficultyLevel.BEGINNER.value)
+    estimated_duration_hours: float = Field(default=0.0)
+    price: float = Field(default=0.0)
+    currency: str = Field(default='USD')
+    thumbnail_url: Optional[str] = Field(default=None)
+    trailer_video_url: Optional[str] = Field(default=None)
+    course_materials: List[Dict[str, Any]] = Field(default_factory=list)
+    vr_environment_id: Optional[str] = Field(default=None)
+    ar_markers: List[Dict[str, Any]] = Field(default_factory=list)
+    spatial_audio_enabled: bool = Field(default=False)
+    haptic_feedback_enabled: bool = Field(default=False)
+    ai_tutor_enabled: bool = Field(default=False)
+    ai_difficulty_adaptation: bool = Field(default=False)
+    ai_content_generation: bool = Field(default=False)
+    status: str = Field(default=CourseStatus.DRAFT.value)
+    is_featured: bool = Field(default=False)
+    enrollment_count: int = Field(default=0)
+    average_rating: float = Field(default=0.0)
+    total_reviews: int = Field(default=0)
+    completion_rate: float = Field(default=0.0)
+    learning_objectives: List[str] = Field(default_factory=list)
+    prerequisites: List[str] = Field(default_factory=list)
+    skills_gained: List[str] = Field(default_factory=list)
+    certificate_enabled: bool = Field(default=False)
+    certificate_template_id: Optional[str] = Field(default=None)
+    ar_content_id: Optional[str] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    published_at: Optional[datetime] = Field(default=None)
 
-class Enrollment(BaseModel):
-    _table_name = "enrollments"
-    _columns = {
-        'id': Field('TEXT', primary_key=True, default=lambda: str(uuid.uuid4())),
-        'user_id': Field('TEXT', nullable=False, index=True),
-        'course_id': Field('TEXT', nullable=False, index=True),
-        'enrolled_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'completed_at': Field('TIMESTAMP'),
-        'progress_percentage': Field('REAL', default=0.0),
-        'payment_amount': Field('REAL', default=0.0),
-        'payment_currency': Field('TEXT'),
-        'payment_method': Field('TEXT'),
-        'total_time_spent_minutes': Field('INTEGER', default=0),
-        'last_accessed': Field('TIMESTAMP'),
-        'completion_certificate_url': Field('TEXT'),
-        'vr_sessions_count': Field('INTEGER', default=0),
-        'ar_sessions_count': Field('INTEGER', default=0),
-        'total_vr_time_minutes': Field('INTEGER', default=0),
-        'created_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'updated_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP')
-    }
+class Module(SQLModel, table=True):
+    """Course modules for organizing lessons"""
+    __tablename__ = "modules"
 
-class LessonProgress(BaseModel):
-    _table_name = "lesson_progress"
-    _columns = {
-        'id': Field('TEXT', primary_key=True, default=lambda: str(uuid.uuid4())),
-        'enrollment_id': Field('TEXT', nullable=False, index=True),
-        'lesson_id': Field('TEXT', nullable=False, index=True),
-        'is_completed': Field('BOOLEAN', default=False),
-        'completion_percentage': Field('REAL', default=0.0),
-        'time_spent_minutes': Field('INTEGER', default=0),
-        'quiz_score': Field('REAL'),
-        'quiz_attempts': Field('INTEGER', default=0),
-        'best_quiz_score': Field('REAL'),
-        'vr_interactions_count': Field('INTEGER', default=0),
-        'ar_objects_manipulated': Field('INTEGER', default=0),
-        'spatial_understanding_score': Field('REAL'),
-        'ai_questions_asked': Field('INTEGER', default=0),
-        'ai_hints_used': Field('INTEGER', default=0),
-        'ai_feedback_rating': Field('REAL'),
-        'started_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'completed_at': Field('TIMESTAMP'),
-        'last_accessed': Field('TIMESTAMP'),
-        'created_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'updated_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP')
-    }
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    course_id: str = Field(index=True, nullable=False)
+    title: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None)
+    order_index: int = Field(nullable=False)
+    is_free: bool = Field(default=False)
+    estimated_duration_hours: float = Field(default=0.0)
+    learning_objectives: List[str] = Field(default_factory=list)
+    prerequisites: List[str] = Field(default_factory=list)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
 
-class CourseReview(BaseModel):
-    _table_name = "course_reviews"
-    _columns = {
-        'id': Field('TEXT', primary_key=True, default=lambda: str(uuid.uuid4())),
-        'user_id': Field('TEXT', nullable=False, index=True),
-        'course_id': Field('TEXT', nullable=False, index=True),
-        'rating': Field('REAL', default=0.0),
-        'title': Field('TEXT'),
-        'content': Field('TEXT'),
-        'content_quality_rating': Field('REAL'),
-        'instructor_rating': Field('REAL'),
-        'value_for_money_rating': Field('REAL'),
-        'vr_experience_rating': Field('REAL'),
-        'ai_tutor_rating': Field('REAL'),
-        'is_verified_purchase': Field('BOOLEAN', default=False),
-        'helpful_votes': Field('INTEGER', default=0),
-        'total_votes': Field('INTEGER', default=0),
-        'created_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP'),
-        'updated_at': Field('TIMESTAMP', default='CURRENT_TIMESTAMP')
-    }
+class Lesson(SQLModel, table=True):
+    """Individual lessons within modules"""
+    __tablename__ = "lessons"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    module_id: str = Field(index=True, nullable=False)
+    course_id: str = Field(index=True, nullable=False)
+    title: str = Field(nullable=False)
+    description: Optional[str] = Field(default=None)
+    content_type: str = Field(nullable=False)
+    order_index: int = Field(nullable=False)
+
+    # Content URLs
+    video_url: Optional[str] = Field(default=None)
+    text_content: Optional[str] = Field(default=None)
+    interactive_content: Optional[Dict[str, Any]] = Field(default=None)
+    vr_scene_url: Optional[str] = Field(default=None)
+    ar_model_url: Optional[str] = Field(default=None)
+    spatial_audio_url: Optional[str] = Field(default=None)
+
+    # VR/AR Features
+    haptic_patterns: List[Dict[str, Any]] = Field(default_factory=list)
+    hand_tracking_data: Optional[Dict[str, Any]] = Field(default=None)
+    spatial_coordinates: Optional[Dict[str, Any]] = Field(default=None)
+
+    # AI Features
+    ai_generated: bool = Field(default=False)
+    ai_model_version: Optional[str] = Field(default=None)
+    ai_generation_prompt: Optional[str] = Field(default=None)
+    ai_difficulty_level: Optional[str] = Field(default=None)
+    ai_adaptive_content: Optional[Dict[str, Any]] = Field(default=None)
+
+    # Learning Features
+    duration_minutes: Optional[int] = Field(default=None)
+    is_free: bool = Field(default=False)
+    requires_vr: bool = Field(default=False)
+    requires_ar: bool = Field(default=False)
+    has_quiz: bool = Field(default=False)
+    quiz_questions: List[Dict[str, Any]] = Field(default_factory=list)
+    passing_score: float = Field(default=70.0)
+
+    # Gamification
+    points_value: int = Field(default=10)
+    badges_available: List[str] = Field(default_factory=list)
+
+    # Offline Support
+    downloadable: bool = Field(default=True)
+    file_size_mb: Optional[float] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class Enrollment(SQLModel, table=True):
+    """User course enrollments with progress tracking"""
+    __tablename__ = "enrollments"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    user_id: str = Field(index=True, nullable=False)
+    course_id: str = Field(index=True, nullable=False)
+    enrolled_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = Field(default=None)
+    progress_percentage: float = Field(default=0.0)
+
+    # Payment Information
+    payment_amount: float = Field(default=0.0)
+    payment_currency: Optional[str] = Field(default=None)
+    payment_method: Optional[str] = Field(default=None)
+    payment_status: str = Field(default="completed")
+
+    # Learning Progress
+    total_time_spent_minutes: int = Field(default=0)
+    last_accessed: Optional[datetime] = Field(default=None)
+    completion_certificate_url: Optional[str] = Field(default=None)
+
+    # VR/AR Sessions
+    vr_sessions_count: int = Field(default=0)
+    ar_sessions_count: int = Field(default=0)
+    total_vr_time_minutes: int = Field(default=0)
+    total_ar_time_minutes: int = Field(default=0)
+
+    # AI Learning Analytics
+    ai_recommendations_used: int = Field(default=0)
+    ai_hints_requested: int = Field(default=0)
+    ai_adaptive_difficulty_changes: int = Field(default=0)
+
+    # Learning Style Adaptation
+    preferred_learning_style: Optional[str] = Field(default=None)
+    adaptive_pace_enabled: bool = Field(default=True)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class LessonProgress(SQLModel, table=True):
+    """Detailed progress tracking for individual lessons"""
+    __tablename__ = "lesson_progress"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    enrollment_id: str = Field(index=True, nullable=False)
+    lesson_id: str = Field(index=True, nullable=False)
+    user_id: str = Field(index=True, nullable=False)
+
+    # Completion Status
+    is_completed: bool = Field(default=False)
+    completion_percentage: float = Field(default=0.0)
+    time_spent_minutes: int = Field(default=0)
+
+    # Quiz Performance
+    quiz_score: Optional[float] = Field(default=None)
+    quiz_attempts: int = Field(default=0)
+    best_quiz_score: Optional[float] = Field(default=None)
+    last_quiz_attempt: Optional[datetime] = Field(default=None)
+
+    # VR/AR Interactions
+    vr_interactions_count: int = Field(default=0)
+    ar_objects_manipulated: int = Field(default=0)
+    spatial_understanding_score: Optional[float] = Field(default=None)
+    hand_tracking_accuracy: Optional[float] = Field(default=None)
+
+    # AI Learning Analytics
+    ai_questions_asked: int = Field(default=0)
+    ai_hints_used: int = Field(default=0)
+    ai_feedback_rating: Optional[float] = Field(default=None)
+    ai_adaptive_hints: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Learning Analytics
+    learning_style_detected: Optional[str] = Field(default=None)
+    attention_span_minutes: Optional[int] = Field(default=None)
+    engagement_score: Optional[float] = Field(default=None)
+
+    # Timestamps
+    started_at: datetime = Field(default_factory=datetime.utcnow)
+    completed_at: Optional[datetime] = Field(default=None)
+    last_accessed: Optional[datetime] = Field(default=None)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CourseReview(SQLModel, table=True):
+    """User reviews and ratings for courses"""
+    __tablename__ = "course_reviews"
+
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
+    user_id: str = Field(index=True, nullable=False)
+    course_id: str = Field(index=True, nullable=False)
+
+    # Overall Rating
+    rating: float = Field(default=0.0)
+    title: Optional[str] = Field(default=None)
+    content: Optional[str] = Field(default=None)
+
+    # Detailed Ratings
+    content_quality_rating: Optional[float] = Field(default=None)
+    instructor_rating: Optional[float] = Field(default=None)
+    value_for_money_rating: Optional[float] = Field(default=None)
+    vr_experience_rating: Optional[float] = Field(default=None)
+    ar_experience_rating: Optional[float] = Field(default=None)
+    ai_tutor_rating: Optional[float] = Field(default=None)
+    difficulty_appropriateness: Optional[float] = Field(default=None)
+
+    # Review Metadata
+    is_verified_purchase: bool = Field(default=False)
+    helpful_votes: int = Field(default=0)
+    total_votes: int = Field(default=0)
+    reported_count: int = Field(default=0)
+
+    # Learning Context
+    completed_course: bool = Field(default=False)
+    time_since_completion_days: Optional[int] = Field(default=None)
+    learning_style_feedback: Optional[str] = Field(default=None)
+
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
