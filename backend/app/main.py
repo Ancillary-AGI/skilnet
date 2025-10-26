@@ -1,159 +1,187 @@
 """
-EduVerse - Advanced E-Learning Platform
-Main FastAPI application with comprehensive features
+EduVerse API - Main FastAPI Application
 """
 
-from fastapi import FastAPI, Depends, HTTPException, WebSocket, WebSocketDisconnect, status, OAuth2PasswordBearer, Request
+from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from fastapi.security import HTTPBearer
+from fastapi.middleware.gzip import GZipMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from contextlib import asynccontextmanager
-import logging
-from typing import List, Optional
-from app.core.config import settings
-from datetime import datetime, timedelta
 import os
-import jwt
-from sqlalchemy.ext.asyncio import AsyncSession
+from pathlib import Path
 
+from app.core.config import settings
 from app.core.database import create_tables, get_db
-from app.core.security import get_current_user
-from app.core.logging import get_logger, log_request_middleware
-from app.middleware.i18n_middleware import I18nMiddleware
-from app.models.user import User
-from app.api.v1.endpoints import auth, translations
+from app.core.logging import setup_logging, get_logger
+from app.api.v1.api import api_router
 
-# Configure advanced logging
+# Setup logging
+setup_logging()
 logger = get_logger(__name__)
-
-# Security configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
-
-# OAuth2 scheme
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan events"""
-    # Startup
-    logger.info("Starting EduVerse platform...")
+    logger.info("🚀 Starting EduVerse API...")
 
-    # Create database tables
-    await create_tables()
-
-    logger.info("Database tables created successfully")
+    try:
+        # Create database tables
+        await create_tables()
+        logger.info("✅ Database tables created successfully")
+    except Exception as e:
+        logger.error(f"❌ Database setup error: {e}")
+        raise
 
     yield
 
-    # Shutdown
-    logger.info("Shutting down EduVerse platform...")
+    logger.info("🔄 Shutting down EduVerse API...")
 
 # Create FastAPI app
 app = FastAPI(
     title="EduVerse API",
     description="Advanced E-Learning Platform with VR/AR and AI capabilities",
     version="1.0.0",
-    docs_url="/api/docs",
-    redoc_url="/api/redoc",
     lifespan=lifespan,
-    openapi_url="/api/v1/openapi.json"
+    docs_url="/docs",
+    redoc_url="/redoc",
+    openapi_url="/openapi.json"
 )
+
+# Add middleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure properly for production
+    allow_origins=["*"],  # Configure appropriately for production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Trusted host middleware (configure for production)
+# Trusted host middleware for production
 if not settings.DEBUG:
     app.add_middleware(
         TrustedHostMiddleware,
         allowed_hosts=settings.ALLOWED_HOSTS
     )
 
-# I18n middleware for multilanguage support
-app.add_middleware(I18nMiddleware, default_language=settings.DEFAULT_LANGUAGE)
+# Mount static files
+static_path = Path(__file__).parent / "static"
+if static_path.exists():
+    app.mount("/static", StaticFiles(directory=str(static_path)), name="static")
 
 # Include API routers
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"])
-app.include_router(translations.router, prefix="/api/v1/translations", tags=["Translations"])
-# TODO: Add other routers as they are refactored
-# app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
-# app.include_router(courses.router, prefix="/api/v1/courses", tags=["Courses"])
+app.include_router(api_router, prefix="/api/v1")
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
-
-async def get_current_user_from_token(
-    token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    """Get current user from JWT token"""
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise credentials_exception
-    except jwt.PyJWTError:
-        raise credentials_exception
-
-    # Query user from database
-    from sqlmodel import select
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalar_one_or_none()
-
-    if user is None:
-        raise credentials_exception
-
-    return user
-
-@app.get("/")
+# Root endpoint
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    """Health check endpoint"""
-    return {
-        "message": "Welcome to EduVerse - The Future of Learning",
-        "version": "1.0.0",
-        "status": "operational"
-    }
+    """Beautiful landing page for the API"""
+    return """
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>EduVerse API - The Future of Learning</title>
+        <style>
+            body {
+                font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                min-height: 100vh;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                margin: 0;
+                padding: 20px;
+            }
+            .container {
+                background: rgba(255, 255, 255, 0.95);
+                border-radius: 20px;
+                padding: 40px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+                text-align: center;
+                max-width: 600px;
+                width: 100%;
+            }
+            .logo {
+                font-size: 3rem;
+                font-weight: bold;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                -webkit-background-clip: text;
+                -webkit-text-fill-color: transparent;
+                margin-bottom: 20px;
+            }
+            .subtitle {
+                color: #666;
+                font-size: 1.2rem;
+                margin-bottom: 30px;
+                line-height: 1.6;
+            }
+            .cta-buttons {
+                display: flex;
+                gap: 15px;
+                justify-content: center;
+                margin-top: 30px;
+                flex-wrap: wrap;
+            }
+            .btn {
+                padding: 12px 24px;
+                border: none;
+                border-radius: 25px;
+                font-size: 1rem;
+                cursor: pointer;
+                text-decoration: none;
+                transition: all 0.3s ease;
+                display: inline-block;
+            }
+            .btn-primary {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+            .btn-primary:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+            }
+            .btn-secondary {
+                background: transparent;
+                color: #667eea;
+                border: 2px solid #667eea;
+            }
+            .btn-secondary:hover {
+                background: #667eea;
+                color: white;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="logo">🎓 EduVerse</div>
+            <p class="subtitle">
+                The future of social e-learning with VR/AR capabilities and AI-powered personalization.
+                Experience education like never before.
+            </p>
+            <div class="cta-buttons">
+                <a href="/docs" class="btn btn-primary">📖 View API Docs</a>
+                <a href="/api/v1/health" class="btn btn-secondary">ℹ️ API Health</a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
 
+# Health check endpoint
 @app.get("/health")
 async def health_check():
-    """Detailed health check"""
+    """Basic health check"""
     return {
         "status": "healthy",
-        "timestamp": datetime.utcnow().isoformat(),
-        "service": "EduVerse API"
+        "service": "EduVerse API",
+        "version": "1.0.0"
     }
-
-# WebSocket endpoints (commented out until services are refactored)
-# @app.websocket("/ws/classroom/{room_id}")
-# async def websocket_classroom(
-#     websocket: WebSocket,
-#     room_id: str,
-#     current_user: User = Depends(get_current_user_from_token)
-# ):
-#     """WebSocket endpoint for real-time classroom interactions"""
-#     # TODO: Implement WebSocket manager with SQLModel
-#     pass
 
 if __name__ == "__main__":
     import uvicorn
@@ -161,6 +189,6 @@ if __name__ == "__main__":
         "main:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=settings.DEBUG,
         log_level="info"
     )

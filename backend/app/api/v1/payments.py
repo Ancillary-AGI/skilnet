@@ -17,7 +17,7 @@ import hashlib
 from app.core.database import get_db
 from app.core.security import get_current_active_user
 from app.core.config import settings
-from backend.app.models.profile import User
+from app.models.user import User
 from app.models.subscription import Subscription, Payment, PaymentStatus, PaymentMethod, Invoice
 from app.repositories.subscription_repository import SubscriptionRepository
 from app.services.payment_processor import PaymentProcessor

@@ -1,289 +1,515 @@
 """
-WebSocket connection manager for real-time features
+WebSocket Manager for Real-Time Communication
+Handles real-time events, collaboration, and live features
 """
 
-from typing import Dict, List, Set, Any
-from fastapi import WebSocket
+import asyncio
 import json
 import logging
-from datetime import datetime
-import asyncio
+from typing import Dict, List, Set, Any
+from datetime import datetime, timedelta
+from fastapi import WebSocket, WebSocketDisconnect
+import redis
+import aioredis
+from sqlalchemy.orm import Session
+from app.core.database import SessionLocal
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+class ConnectionManager:
+    """Manages WebSocket connections for real-time communication"""
 
-class WebSocketManager:
-    """Manage WebSocket connections for real-time features"""
-    
     def __init__(self):
-        # Active connections by room
-        self.active_connections: Dict[str, List[WebSocket]] = {}
-        
-        # User mapping for rooms
-        self.room_users: Dict[str, Set[str]] = {}
-        
-        # Connection metadata
-        self.connection_metadata: Dict[WebSocket, Dict] = {}
-    
-    async def connect(self, websocket: WebSocket, room_id: str, user_id: str):
-        """Connect user to a room"""
+        self.active_connections: Dict[str, WebSocket] = {}
+        self.rooms: Dict[str, Set[str]] = {}
+        self.user_rooms: Dict[str, Set[str]] = {}
+        self.heartbeat_intervals: Dict[str, asyncio.Task] = {}
+
+    async def connect(self, websocket: WebSocket, user_id: str):
+        """Accept WebSocket connection"""
         await websocket.accept()
-        
-        # Add to room connections
-        if room_id not in self.active_connections:
-            self.active_connections[room_id] = []
-        self.active_connections[room_id].append(websocket)
-        
-        # Add user to room
-        if room_id not in self.room_users:
-            self.room_users[room_id] = set()
-        self.room_users[room_id].add(user_id)
-        
-        # Store connection metadata
-        self.connection_metadata[websocket] = {
-            "room_id": room_id,
-            "user_id": user_id,
-            "connected_at": datetime.utcnow(),
-            "message_count": 0
-        }
-        
-        # Notify room about new user
+
+        # Store connection
+        self.active_connections[user_id] = websocket
+
+        # Start heartbeat monitoring
+        self._start_heartbeat(user_id, websocket)
+
+        logger.info(f"User {user_id} connected via WebSocket")
+
+        # Send welcome message
+        await self.send_personal_message(user_id, {
+            "type": "connection_established",
+            "message": "Connected to EduVerse real-time services",
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+    def _start_heartbeat(self, user_id: str, websocket: WebSocket):
+        """Start heartbeat monitoring for connection"""
+        async def heartbeat():
+            try:
+                while True:
+                    await asyncio.sleep(30)  # Send heartbeat every 30 seconds
+                    if user_id in self.active_connections:
+                        await self.send_personal_message(user_id, {
+                            "type": "heartbeat",
+                            "timestamp": datetime.utcnow().isoformat()
+                        })
+            except asyncio.CancelledError:
+                pass
+            except Exception as e:
+                logger.error(f"Heartbeat error for user {user_id}: {e}")
+
+        task = asyncio.create_task(heartbeat())
+        self.heartbeat_intervals[user_id] = task
+
+    async def disconnect(self, user_id: str):
+        """Handle WebSocket disconnection"""
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+
+        if user_id in self.heartbeat_intervals:
+            self.heartbeat_intervals[user_id].cancel()
+            del self.heartbeat_intervals[user_id]
+
+        # Remove user from all rooms
+        if user_id in self.user_rooms:
+            for room_id in self.user_rooms[user_id]:
+                await self.leave_room(room_id, user_id)
+            del self.user_rooms[user_id]
+
+        logger.info(f"User {user_id} disconnected from WebSocket")
+
+    async def join_room(self, room_id: str, user_id: str):
+        """Add user to a room"""
+        if room_id not in self.rooms:
+            self.rooms[room_id] = set()
+
+        self.rooms[room_id].add(user_id)
+
+        if user_id not in self.user_rooms:
+            self.user_rooms[user_id] = set()
+
+        self.user_rooms[user_id].add(room_id)
+
+        # Notify other room members
         await self.broadcast_to_room(room_id, {
             "type": "user_joined",
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat(),
-            "room_user_count": len(self.room_users[room_id])
+            "room_id": room_id,
+            "timestamp": datetime.utcnow().isoformat()
         }, exclude_user=user_id)
-        
-        logger.info(f"User {user_id} connected to room {room_id}")
-    
-    def disconnect(self, websocket: WebSocket, room_id: str, user_id: str):
-        """Disconnect user from room"""
-        # Remove connection from room
-        if room_id in self.active_connections:
-            if websocket in self.active_connections[room_id]:
-                self.active_connections[room_id].remove(websocket)
-            
-            # Clean up empty rooms
-            if not self.active_connections[room_id]:
-                del self.active_connections[room_id]
-        
-        # Remove user from room
-        if room_id in self.room_users:
-            self.room_users[room_id].discard(user_id)
-            if not self.room_users[room_id]:
-                del self.room_users[room_id]
-        
-        # Remove connection metadata
-        if websocket in self.connection_metadata:
-            del self.connection_metadata[websocket]
-        
-        # Notify room about user leaving
-        asyncio.create_task(self.broadcast_to_room(room_id, {
+
+        logger.info(f"User {user_id} joined room {room_id}")
+
+    async def leave_room(self, room_id: str, user_id: str):
+        """Remove user from a room"""
+        if room_id in self.rooms and user_id in self.rooms[room_id]:
+            self.rooms[room_id].remove(user_id)
+
+            if not self.rooms[room_id]:
+                del self.rooms[room_id]
+
+        if user_id in self.user_rooms and room_id in self.user_rooms[user_id]:
+            self.user_rooms[user_id].remove(room_id)
+
+            if not self.user_rooms[user_id]:
+                del self.user_rooms[user_id]
+
+        # Notify other room members
+        await self.broadcast_to_room(room_id, {
             "type": "user_left",
             "user_id": user_id,
-            "timestamp": datetime.utcnow().isoformat(),
-            "room_user_count": len(self.room_users.get(room_id, set()))
-        }, exclude_user=user_id))
-        
-        logger.info(f"User {user_id} disconnected from room {room_id}")
-    
-    async def send_personal_message(self, message: str, websocket: WebSocket):
-        """Send message to specific connection"""
-        try:
-            await websocket.send_text(message)
-            
-            # Update message count
-            if websocket in self.connection_metadata:
-                self.connection_metadata[websocket]["message_count"] += 1
-                
-        except Exception as e:
-            logger.error(f"Error sending personal message: {e}")
-    
-    async def broadcast_to_room(
-        self, 
-        room_id: str, 
-        message: Any, 
-        exclude_user: str = None
-    ):
-        """Broadcast message to all users in a room"""
-        if room_id not in self.active_connections:
-            return
-        
-        # Convert message to JSON if it's a dict
-        if isinstance(message, dict):
-            message_text = json.dumps(message)
-        else:
-            message_text = str(message)
-        
-        # Send to all connections in room
-        disconnected_connections = []
-        
-        for connection in self.active_connections[room_id]:
+            "room_id": room_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }, exclude_user=user_id)
+
+        logger.info(f"User {user_id} left room {room_id}")
+
+    async def send_personal_message(self, user_id: str, message: Dict[str, Any]):
+        """Send message to specific user"""
+        if user_id in self.active_connections:
             try:
-                # Skip excluded user
-                if exclude_user and connection in self.connection_metadata:
-                    if self.connection_metadata[connection]["user_id"] == exclude_user:
-                        continue
-                
-                await connection.send_text(message_text)
-                
-                # Update message count
-                if connection in self.connection_metadata:
-                    self.connection_metadata[connection]["message_count"] += 1
-                    
+                websocket = self.active_connections[user_id]
+                await websocket.send_text(json.dumps(message))
             except Exception as e:
-                logger.error(f"Error broadcasting to connection: {e}")
-                disconnected_connections.append(connection)
-        
-        # Clean up disconnected connections
-        for connection in disconnected_connections:
-            if connection in self.active_connections[room_id]:
-                self.active_connections[room_id].remove(connection)
-            if connection in self.connection_metadata:
-                del self.connection_metadata[connection]
-    
-    async def broadcast_to_all_rooms(self, message: Any):
-        """Broadcast message to all active rooms"""
-        for room_id in self.active_connections:
-            await self.broadcast_to_room(room_id, message)
-    
+                logger.error(f"Error sending message to user {user_id}: {e}")
+                await self.disconnect(user_id)
+
+    async def broadcast_to_room(self, room_id: str, message: Dict[str, Any], exclude_user: str = None):
+        """Broadcast message to all users in a room"""
+        if room_id not in self.rooms:
+            return
+
+        disconnected_users = []
+        for user_id in self.rooms[room_id]:
+            if exclude_user and user_id == exclude_user:
+                continue
+
+            if user_id in self.active_connections:
+                try:
+                    websocket = self.active_connections[user_id]
+                    await websocket.send_text(json.dumps(message))
+                except Exception as e:
+                    logger.error(f"Error broadcasting to user {user_id}: {e}")
+                    disconnected_users.append(user_id)
+            else:
+                disconnected_users.append(user_id)
+
+        # Clean up disconnected users
+        for user_id in disconnected_users:
+            if user_id in self.rooms[room_id]:
+                self.rooms[room_id].remove(user_id)
+            await self.disconnect(user_id)
+
+    async def broadcast_to_all(self, message: Dict[str, Any]):
+        """Broadcast message to all connected users"""
+        disconnected_users = []
+        for user_id, websocket in self.active_connections.items():
+            try:
+                await websocket.send_text(json.dumps(message))
+            except Exception as e:
+                logger.error(f"Error broadcasting to user {user_id}: {e}")
+                disconnected_users.append(user_id)
+
+        # Clean up disconnected users
+        for user_id in disconnected_users:
+            await self.disconnect(user_id)
+
     def get_room_users(self, room_id: str) -> List[str]:
         """Get list of users in a room"""
-        return list(self.room_users.get(room_id, set()))
-    
-    def get_active_rooms(self) -> List[str]:
-        """Get list of active rooms"""
-        return list(self.active_connections.keys())
-    
-    def get_connection_stats(self) -> Dict[str, Any]:
-        """Get connection statistics"""
-        total_connections = sum(len(connections) for connections in self.active_connections.values())
-        
-        return {
-            "total_connections": total_connections,
-            "active_rooms": len(self.active_connections),
-            "total_users": sum(len(users) for users in self.room_users.values()),
-            "rooms": {
-                room_id: {
-                    "connections": len(connections),
-                    "users": len(self.room_users.get(room_id, set()))
-                }
-                for room_id, connections in self.active_connections.items()
-            }
-        }
+        return list(self.rooms.get(room_id, set()))
 
+    def get_user_rooms(self, user_id: str) -> List[str]:
+        """Get list of rooms user is in"""
+        return list(self.user_rooms.get(user_id, set()))
 
-class VRClassroomManager:
-    """Specialized manager for VR classroom sessions"""
-    
-    def __init__(self, websocket_manager: WebSocketManager):
-        self.websocket_manager = websocket_manager
-        self.vr_sessions: Dict[str, Dict] = {}
-        self.spatial_data: Dict[str, Dict] = {}
-    
-    async def create_vr_session(
-        self, 
-        room_id: str, 
-        instructor_id: str, 
-        max_participants: int = 30
-    ) -> Dict[str, Any]:
-        """Create a new VR classroom session"""
-        session_config = {
-            "room_id": room_id,
-            "instructor_id": instructor_id,
-            "max_participants": max_participants,
-            "created_at": datetime.utcnow(),
-            "participants": set(),
-            "spatial_objects": {},
-            "shared_whiteboard": {"content": [], "version": 0},
-            "voice_channels": {},
-            "recording_enabled": True
-        }
-        
-        self.vr_sessions[room_id] = session_config
-        
-        logger.info(f"Created VR session for room {room_id}")
-        return session_config
-    
-    async def handle_spatial_update(
-        self, 
-        room_id: str, 
-        user_id: str, 
-        spatial_data: Dict[str, Any]
-    ):
-        """Handle user spatial position updates in VR"""
-        if room_id not in self.spatial_data:
-            self.spatial_data[room_id] = {}
-        
-        self.spatial_data[room_id][user_id] = {
-            "position": spatial_data.get("position", [0, 0, 0]),
-            "rotation": spatial_data.get("rotation", [0, 0, 0, 1]),
-            "head_position": spatial_data.get("head_position", [0, 1.7, 0]),
-            "hand_positions": spatial_data.get("hand_positions", {}),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        
-        # Broadcast spatial update to other users in room
-        await self.websocket_manager.broadcast_to_room(room_id, {
-            "type": "spatial_update",
-            "user_id": user_id,
-            "spatial_data": self.spatial_data[room_id][user_id]
-        }, exclude_user=user_id)
-    
-    async def handle_object_interaction(
-        self, 
-        room_id: str, 
-        user_id: str, 
-        interaction_data: Dict[str, Any]
-    ):
-        """Handle VR object interactions"""
-        object_id = interaction_data.get("object_id")
-        action = interaction_data.get("action")
-        
-        # Update object state
-        if room_id in self.vr_sessions:
-            session = self.vr_sessions[room_id]
-            if object_id not in session["spatial_objects"]:
-                session["spatial_objects"][object_id] = {}
-            
-            session["spatial_objects"][object_id].update({
-                "last_interaction": {
-                    "user_id": user_id,
-                    "action": action,
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "data": interaction_data
-                }
-            })
-        
-        # Broadcast interaction to all users
-        await self.websocket_manager.broadcast_to_room(room_id, {
-            "type": "object_interaction",
-            "object_id": object_id,
-            "user_id": user_id,
-            "action": action,
-            "interaction_data": interaction_data
-        })
-    
-    async def update_shared_whiteboard(
-        self, 
-        room_id: str, 
-        user_id: str, 
-        whiteboard_data: Dict[str, Any]
-    ):
-        """Update shared VR whiteboard"""
-        if room_id in self.vr_sessions:
-            session = self.vr_sessions[room_id]
-            session["shared_whiteboard"]["content"].append({
+# Global connection manager
+manager = ConnectionManager()
+
+class WebSocketManager:
+    """Main WebSocket manager for handling connections and events"""
+
+    def __init__(self):
+        self.redis_client = None
+        self.pubsub = None
+
+    async def initialize_redis(self):
+        """Initialize Redis for distributed WebSocket management"""
+        try:
+            self.redis_client = aioredis.from_url(
+                settings.REDIS_URL,
+                encoding="utf-8",
+                decode_responses=True
+            )
+            self.pubsub = self.redis_client.pubsub()
+            await self.pubsub.subscribe("websocket_events")
+            logger.info("Redis initialized for WebSocket management")
+        except Exception as e:
+            logger.error(f"Failed to initialize Redis: {e}")
+
+    async def handle_message(self, user_id: str, message: Dict[str, Any]):
+        """Handle incoming WebSocket message"""
+        message_type = message.get("type")
+
+        try:
+            if message_type == "join_room":
+                room_id = message.get("room_id")
+                if room_id:
+                    await manager.join_room(room_id, user_id)
+
+            elif message_type == "leave_room":
+                room_id = message.get("room_id")
+                if room_id:
+                    await manager.leave_room(room_id, user_id)
+
+            elif message_type == "send_message":
+                room_id = message.get("room_id")
+                content = message.get("content")
+                if room_id and content:
+                    await manager.broadcast_to_room(room_id, {
+                        "type": "new_message",
+                        "user_id": user_id,
+                        "content": content,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+
+            elif message_type == "typing_start":
+                room_id = message.get("room_id")
+                if room_id:
+                    await manager.broadcast_to_room(room_id, {
+                        "type": "typing_start",
+                        "user_id": user_id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }, exclude_user=user_id)
+
+            elif message_type == "typing_stop":
+                room_id = message.get("room_id")
+                if room_id:
+                    await manager.broadcast_to_room(room_id, {
+                        "type": "typing_stop",
+                        "user_id": user_id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }, exclude_user=user_id)
+
+            elif message_type == "presence_update":
+                status = message.get("status", "online")
+                # Update user presence in database
+                await self._update_user_presence(user_id, status)
+
+            elif message_type == "heartbeat_response":
+                # Update last seen timestamp
+                await self._update_user_activity(user_id)
+
+            # Handle collaboration-specific events
+            elif message_type == "whiteboard_stroke":
+                room_id = message.get("room_id")
+                stroke_data = message.get("stroke_data")
+                if room_id and stroke_data:
+                    await manager.broadcast_to_room(room_id, {
+                        "type": "whiteboard_stroke",
+                        "user_id": user_id,
+                        "stroke_data": stroke_data,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+
+            elif message_type == "screen_share_started":
+                room_id = message.get("room_id")
+                if room_id:
+                    await manager.broadcast_to_room(room_id, {
+                        "type": "screen_share_started",
+                        "user_id": user_id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+
+            elif message_type == "screen_share_stopped":
+                room_id = message.get("room_id")
+                if room_id:
+                    await manager.broadcast_to_room(room_id, {
+                        "type": "screen_share_stopped",
+                        "user_id": user_id,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+
+            # Handle learning events
+            elif message_type == "lesson_completed":
+                course_id = message.get("course_id")
+                lesson_id = message.get("lesson_id")
+                if course_id and lesson_id:
+                    await self._handle_lesson_completion(user_id, course_id, lesson_id)
+
+            elif message_type == "quiz_submitted":
+                quiz_id = message.get("quiz_id")
+                score = message.get("score")
+                if quiz_id and score is not None:
+                    await self._handle_quiz_submission(user_id, quiz_id, score)
+
+            # Handle social events
+            elif message_type == "discussion_post":
+                content = message.get("content")
+                category = message.get("category")
+                if content and category:
+                    await self._handle_discussion_post(user_id, content, category)
+
+            elif message_type == "achievement_unlocked":
+                achievement_id = message.get("achievement_id")
+                if achievement_id:
+                    await self._handle_achievement_unlock(user_id, achievement_id)
+
+        except Exception as e:
+            logger.error(f"Error handling message from user {user_id}: {e}")
+
+    async def _update_user_presence(self, user_id: str, status: str):
+        """Update user presence status"""
+        try:
+            db: Session = SessionLocal()
+            # Update user presence in database
+            # This would update a user_presence table
+            db.close()
+        except Exception as e:
+            logger.error(f"Error updating user presence: {e}")
+
+    async def _update_user_activity(self, user_id: str):
+        """Update user last activity timestamp"""
+        try:
+            db: Session = SessionLocal()
+            # Update user last_seen timestamp
+            # This would update the user table
+            db.close()
+        except Exception as e:
+            logger.error(f"Error updating user activity: {e}")
+
+    async def _handle_lesson_completion(self, user_id: str, course_id: str, lesson_id: str):
+        """Handle lesson completion event"""
+        try:
+            # Update progress in database
+            db: Session = SessionLocal()
+            # Update user progress
+            # Check for achievements
+            # Update analytics
+            db.close()
+
+            # Broadcast to course followers
+            await manager.broadcast_to_room(f"course_{course_id}", {
+                "type": "lesson_completed",
                 "user_id": user_id,
-                "data": whiteboard_data,
+                "course_id": course_id,
+                "lesson_id": lesson_id,
                 "timestamp": datetime.utcnow().isoformat()
             })
-            session["shared_whiteboard"]["version"] += 1
-            
-            # Broadcast whiteboard update
-            await self.websocket_manager.broadcast_to_room(room_id, {
-                "type": "whiteboard_update",
-                "content": session["shared_whiteboard"],
-                "updated_by": user_id
+
+        except Exception as e:
+            logger.error(f"Error handling lesson completion: {e}")
+
+    async def _handle_quiz_submission(self, user_id: str, quiz_id: str, score: float):
+        """Handle quiz submission event"""
+        try:
+            # Update quiz results in database
+            db: Session = SessionLocal()
+            # Update user analytics
+            # Check for achievements
+            db.close()
+
+            # Broadcast quiz completion
+            await manager.broadcast_to_room(f"quiz_{quiz_id}", {
+                "type": "quiz_completed",
+                "user_id": user_id,
+                "quiz_id": quiz_id,
+                "score": score,
+                "timestamp": datetime.utcnow().isoformat()
             })
+
+        except Exception as e:
+            logger.error(f"Error handling quiz submission: {e}")
+
+    async def _handle_discussion_post(self, user_id: str, content: str, category: str):
+        """Handle discussion post event"""
+        try:
+            # Save discussion post to database
+            db: Session = SessionLocal()
+            # Create discussion post record
+            # Update user activity
+            db.close()
+
+            # Broadcast to discussion followers
+            await manager.broadcast_to_room(f"discussion_{category}", {
+                "type": "new_discussion_post",
+                "user_id": user_id,
+                "content": content,
+                "category": category,
+                "timestamp": datetime.utcnow().isoformat()
+            })
+
+        except Exception as e:
+            logger.error(f"Error handling discussion post: {e}")
+
+    async def _handle_achievement_unlock(self, user_id: str, achievement_id: str):
+        """Handle achievement unlock event"""
+        try:
+            # Update user achievements in database
+            db: Session = SessionLocal()
+            # Create achievement record
+            # Update gamification stats
+            db.close()
+
+            # Broadcast achievement to user's friends/followers
+            user_rooms = manager.get_user_rooms(user_id)
+            for room_id in user_rooms:
+                await manager.broadcast_to_room(room_id, {
+                    "type": "achievement_unlocked",
+                    "user_id": user_id,
+                    "achievement_id": achievement_id,
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+
+        except Exception as e:
+            logger.error(f"Error handling achievement unlock: {e}")
+
+    async def send_system_announcement(self, message: str, target_audience: str = "all"):
+        """Send system-wide announcement"""
+        announcement = {
+            "type": "system_announcement",
+            "message": message,
+            "audience": target_audience,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+        if target_audience == "all":
+            await manager.broadcast_to_all(announcement)
+        else:
+            # Send to specific audience (e.g., course students, premium users)
+            await self._broadcast_to_audience(announcement, target_audience)
+
+    async def _broadcast_to_audience(self, message: Dict[str, Any], audience: str):
+        """Broadcast message to specific audience"""
+        # This would query database for users matching the audience criteria
+        # and send messages to their active connections
+        pass
+
+    async def get_user_statistics(self, user_id: str) -> Dict[str, Any]:
+        """Get real-time statistics for user"""
+        return {
+            "active_connections": len(manager.active_connections),
+            "user_rooms": len(manager.get_user_rooms(user_id)),
+            "room_users": {room_id: len(users) for room_id, users in manager.rooms.items()},
+            "last_activity": datetime.utcnow().isoformat()
+        }
+
+# Global WebSocket manager
+websocket_manager = WebSocketManager()
+
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """Main WebSocket endpoint"""
+    await manager.connect(websocket, user_id)
+
+    try:
+        while True:
+            # Receive message from client
+            data = await websocket.receive_text()
+
+            try:
+                message = json.loads(data)
+                await websocket_manager.handle_message(user_id, message)
+            except json.JSONDecodeError:
+                # Send error message for invalid JSON
+                await manager.send_personal_message(user_id, {
+                    "type": "error",
+                    "message": "Invalid JSON format",
+                    "timestamp": datetime.utcnow().isoformat()
+                })
+
+    except WebSocketDisconnect:
+        await manager.disconnect(user_id)
+    except Exception as e:
+        logger.error(f"WebSocket error for user {user_id}: {e}")
+        await manager.disconnect(user_id)
+
+# Background task to clean up inactive connections
+async def cleanup_inactive_connections():
+    """Clean up connections that haven't sent heartbeat"""
+    while True:
+        try:
+            current_time = datetime.utcnow()
+            inactive_users = []
+
+            # Check for inactive connections (no heartbeat for 5 minutes)
+            for user_id, connection in manager.active_connections.items():
+                # In a real implementation, you'd track last heartbeat time
+                # For now, we'll just clean up obviously dead connections
+                try:
+                    await connection.ping()
+                except:
+                    inactive_users.append(user_id)
+
+            # Disconnect inactive users
+            for user_id in inactive_users:
+                await manager.disconnect(user_id)
+
+        except Exception as e:
+            logger.error(f"Error in cleanup task: {e}")
+
+        await asyncio.sleep(60)  # Run cleanup every minute
+
+# Start cleanup task when module is imported
+asyncio.create_task(cleanup_inactive_connections())

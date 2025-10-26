@@ -10,7 +10,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 from pathlib import Path
 import os
-from pythonjsonlogger import jsonlogger
+# from pythonjsonlogger import jsonlogger  # Optional dependency
 
 from app.core.config import settings
 
@@ -40,17 +40,20 @@ class EduVerseFormatter(logging.Formatter):
         return super().format(record)
 
 
-class JSONFormatter(jsonlogger.JsonFormatter):
+class JSONFormatter(logging.Formatter):
     """JSON formatter for structured logging"""
 
-    def add_fields(self, log_record: Dict[str, Any], record: logging.LogRecord, message_dict: Dict[str, Any]) -> None:
-        super().add_fields(log_record, record, message_dict)
-
-        # Add custom fields
-        log_record['timestamp'] = datetime.utcnow().isoformat()
-        log_record['service'] = 'eduverse-api'
-        log_record['environment'] = os.getenv('ENVIRONMENT', 'development')
-        log_record['version'] = settings.VERSION
+    def format(self, record: logging.LogRecord) -> str:
+        # Create JSON log record
+        log_record = {
+            'timestamp': datetime.utcnow().isoformat(),
+            'service': 'eduverse-api',
+            'environment': os.getenv('ENVIRONMENT', 'development'),
+            'version': getattr(settings, 'VERSION', '1.0.0'),
+            'level': record.levelname,
+            'logger': record.name,
+            'message': record.getMessage(),
+        }
 
         # Add request context if available
         if hasattr(record, 'request_id'):
@@ -61,6 +64,12 @@ class JSONFormatter(jsonlogger.JsonFormatter):
             log_record['user_agent'] = record.user_agent
         if hasattr(record, 'ip_address'):
             log_record['ip_address'] = record.ip_address
+
+        # Add exception info if present
+        if record.exc_info:
+            log_record['exception'] = self.formatException(record.exc_info)
+
+        return json.dumps(log_record)
 
 
 def setup_logging(

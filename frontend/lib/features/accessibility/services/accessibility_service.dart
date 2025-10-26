@@ -53,32 +53,37 @@ class AccessibilityProfile {
   });
 
   Map<String, dynamic> toJson() => {
-    'userId': userId,
-    'disabilityTypes': disabilityTypes.map((e) => e.toString()).toList(),
-    'severityLevels': severityLevels.map((k, v) => MapEntry(k.toString(), v)),
-    'preferredFeatures': preferredFeatures.map((e) => e.toString()).toList(),
-    'assistiveTechnologies': assistiveTechnologies,
-    'customizations': customizations,
-    'languagePreferences': languagePreferences,
-    'culturalConsiderations': culturalConsiderations,
-  };
+        'userId': userId,
+        'disabilityTypes': disabilityTypes.map((e) => e.toString()).toList(),
+        'severityLevels':
+            severityLevels.map((k, v) => MapEntry(k.toString(), v)),
+        'preferredFeatures':
+            preferredFeatures.map((e) => e.toString()).toList(),
+        'assistiveTechnologies': assistiveTechnologies,
+        'customizations': customizations,
+        'languagePreferences': languagePreferences,
+        'culturalConsiderations': culturalConsiderations,
+      };
 
   factory AccessibilityProfile.fromJson(Map<String, dynamic> json) {
     return AccessibilityProfile(
       userId: json['userId'],
       disabilityTypes: (json['disabilityTypes'] as List)
-          .map((e) => DisabilityType.values.firstWhere((type) => type.toString() == e))
+          .map((e) =>
+              DisabilityType.values.firstWhere((type) => type.toString() == e))
           .toList(),
       severityLevels: Map<DisabilityType, String>.fromEntries(
         (json['severityLevels'] as Map<String, dynamic>).entries.map(
-          (entry) => MapEntry(
-            DisabilityType.values.firstWhere((type) => type.toString() == entry.key),
-            entry.value,
-          ),
-        ),
+              (entry) => MapEntry(
+                DisabilityType.values
+                    .firstWhere((type) => type.toString() == entry.key),
+                entry.value,
+              ),
+            ),
       ),
       preferredFeatures: (json['preferredFeatures'] as List)
-          .map((e) => AccessibilityFeature.values.firstWhere((feature) => feature.toString() == e))
+          .map((e) => AccessibilityFeature.values
+              .firstWhere((feature) => feature.toString() == e))
           .toList(),
       assistiveTechnologies: List<String>.from(json['assistiveTechnologies']),
       customizations: json['customizations'],
@@ -89,66 +94,67 @@ class AccessibilityProfile {
 }
 
 class AccessibilityService {
-  static final AccessibilityService _instance = AccessibilityService._internal();
+  static final AccessibilityService _instance =
+      AccessibilityService._internal();
   factory AccessibilityService() => _instance;
   AccessibilityService._internal();
 
   late SharedPreferences _prefs;
   late FlutterTts _tts;
   late SpeechToText _speechToText;
-  
+
   AccessibilityProfile? _currentProfile;
   bool _isInitialized = false;
-  
+
   // TTS state
   bool _isSpeaking = false;
   double _speechRate = 0.5;
   double _speechPitch = 1.0;
   double _speechVolume = 1.0;
   String _selectedVoice = '';
-  
+
   // Speech recognition state
   bool _isListening = false;
   String _recognizedText = '';
-  
+
   // Screen reader state
   bool _screenReaderEnabled = false;
-  
+
   // High contrast state
   bool _highContrastEnabled = false;
-  
+
   // Large text state
   double _textScaleFactor = 1.0;
-  
+
   // Voice control state
   bool _voiceControlEnabled = false;
   Map<String, VoidCallback> _voiceCommands = {};
-  
+
   // Keyboard navigation state
   bool _keyboardNavigationEnabled = false;
-  
+
   // Cognitive assistance state
   bool _cognitiveAssistanceEnabled = false;
   bool _simplifiedInterfaceEnabled = false;
   bool _memoryAidsEnabled = false;
-  
+
   // Motor assistance state
   bool _motorAssistanceEnabled = false;
   bool _switchControlEnabled = false;
   double _dwellTime = 1.0;
-  
+
   // Seizure protection state
   bool _seizureProtectionEnabled = false;
   bool _reduceMotionEnabled = false;
-  
+
   // Streams for real-time updates
-  final StreamController<AccessibilityProfile?> _profileController = 
+  final StreamController<AccessibilityProfile?> _profileController =
       StreamController<AccessibilityProfile?>.broadcast();
-  final StreamController<String> _speechController = 
+  final StreamController<String> _speechController =
       StreamController<String>.broadcast();
-  final StreamController<String> _recognitionController = 
+  final StreamController<String> _recognitionController =
       StreamController<String>.broadcast();
-  final StreamController<Map<String, dynamic>> _settingsController = 
+  final StreamController<Map<String, dynamic>> _settingsController =
       StreamController<Map<String, dynamic>>.broadcast();
 
   // Getters
@@ -164,7 +170,7 @@ class AccessibilityService {
   bool get cognitiveAssistanceEnabled => _cognitiveAssistanceEnabled;
   bool get motorAssistanceEnabled => _motorAssistanceEnabled;
   bool get seizureProtectionEnabled => _seizureProtectionEnabled;
-  
+
   // Streams
   Stream<AccessibilityProfile?> get profileStream => _profileController.stream;
   Stream<String> get speechStream => _speechController.stream;
@@ -174,24 +180,23 @@ class AccessibilityService {
   Future<void> initialize() async {
     try {
       _prefs = await SharedPreferences.getInstance();
-      
+
       // Initialize TTS
       _tts = FlutterTts();
       await _initializeTts();
-      
+
       // Initialize Speech Recognition
       _speechToText = SpeechToText();
       await _initializeSpeechRecognition();
-      
+
       // Load saved profile
       await _loadAccessibilityProfile();
-      
+
       // Apply saved settings
       await _applyAccessibilitySettings();
-      
+
       _isInitialized = true;
       debugPrint('AccessibilityService initialized successfully');
-      
     } catch (e) {
       debugPrint('Failed to initialize AccessibilityService: $e');
     }
@@ -204,29 +209,28 @@ class AccessibilityService {
         _isSpeaking = true;
         _speechController.add('started');
       });
-      
+
       _tts.setCompletionHandler(() {
         _isSpeaking = false;
         _speechController.add('completed');
       });
-      
+
       _tts.setErrorHandler((message) {
         _isSpeaking = false;
         _speechController.add('error: $message');
       });
-      
+
       // Configure TTS settings
       await _tts.setSpeechRate(_speechRate);
       await _tts.setPitch(_speechPitch);
       await _tts.setVolume(_speechVolume);
-      
+
       // Get available voices
       final voices = await _tts.getVoices;
       if (voices.isNotEmpty && _selectedVoice.isEmpty) {
         _selectedVoice = voices.first['name'];
         await _tts.setVoice({'name': _selectedVoice, 'locale': 'en-US'});
       }
-      
     } catch (e) {
       debugPrint('Failed to initialize TTS: $e');
     }
@@ -244,24 +248,25 @@ class AccessibilityService {
           _recognitionController.add('error: ${error.errorMsg}');
         },
       );
-      
+
       if (!available) {
         debugPrint('Speech recognition not available');
       }
-      
     } catch (e) {
       debugPrint('Failed to initialize speech recognition: $e');
     }
   }
 
-  Future<void> createAccessibilityProfile(Map<String, dynamic> assessmentData) async {
+  Future<void> createAccessibilityProfile(
+      Map<String, dynamic> assessmentData) async {
     try {
       // Analyze assessment data
       final disabilityTypes = _analyzeDisabilityTypes(assessmentData);
       final severityLevels = _determineSeverityLevels(assessmentData);
-      final recommendedFeatures = _recommendAccessibilityFeatures(disabilityTypes, severityLevels);
+      final recommendedFeatures =
+          _recommendAccessibilityFeatures(disabilityTypes, severityLevels);
       final assistiveTech = _detectAssistiveTechnologies(assessmentData);
-      
+
       // Create profile
       _currentProfile = AccessibilityProfile(
         userId: assessmentData['userId'] ?? 'anonymous',
@@ -270,19 +275,19 @@ class AccessibilityService {
         preferredFeatures: recommendedFeatures,
         assistiveTechnologies: assistiveTech,
         customizations: _generateDefaultCustomizations(disabilityTypes),
-        languagePreferences: List<String>.from(assessmentData['languages'] ?? ['en']),
+        languagePreferences:
+            List<String>.from(assessmentData['languages'] ?? ['en']),
         culturalConsiderations: assessmentData['culturalFactors'] ?? {},
       );
-      
+
       // Save profile
       await _saveAccessibilityProfile();
-      
+
       // Apply settings
       await _applyAccessibilitySettings();
-      
+
       // Notify listeners
       _profileController.add(_currentProfile);
-      
     } catch (e) {
       debugPrint('Failed to create accessibility profile: $e');
     }
@@ -316,48 +321,56 @@ class AccessibilityService {
 
   Future<void> _applyAccessibilitySettings() async {
     if (_currentProfile == null) return;
-    
+
     // Apply screen reader settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.screenReader)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.screenReader)) {
       await enableScreenReader();
     }
-    
+
     // Apply high contrast settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.highContrast)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.highContrast)) {
       await enableHighContrast();
     }
-    
+
     // Apply large text settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.largeText)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.largeText)) {
       final fontSize = _currentProfile!.customizations['font_size'] ?? 1.2;
       await setTextScaleFactor(fontSize);
     }
-    
+
     // Apply voice control settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.voiceControl)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.voiceControl)) {
       await enableVoiceControl();
     }
-    
+
     // Apply keyboard navigation settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.keyboardNavigation)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.keyboardNavigation)) {
       await enableKeyboardNavigation();
     }
-    
+
     // Apply cognitive assistance settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.cognitiveAssistance)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.cognitiveAssistance)) {
       await enableCognitiveAssistance();
     }
-    
+
     // Apply motor assistance settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.motorAssistance)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.motorAssistance)) {
       await enableMotorAssistance();
     }
-    
+
     // Apply seizure protection settings
-    if (_currentProfile!.preferredFeatures.contains(AccessibilityFeature.seizureProtection)) {
+    if (_currentProfile!.preferredFeatures
+        .contains(AccessibilityFeature.seizureProtection)) {
       await enableSeizureProtection();
     }
-    
+
     // Notify settings change
     _notifySettingsChange();
   }
@@ -366,10 +379,10 @@ class AccessibilityService {
   Future<void> enableScreenReader() async {
     _screenReaderEnabled = true;
     await _prefs.setBool('screen_reader_enabled', true);
-    
+
     // Enable semantic announcements
     SemanticsService.announce('Screen reader enabled', TextDirection.ltr);
-    
+
     _notifySettingsChange();
   }
 
@@ -381,12 +394,12 @@ class AccessibilityService {
 
   Future<void> speak(String text, {bool interrupt = false}) async {
     if (!_screenReaderEnabled && !_voiceControlEnabled) return;
-    
+
     try {
       if (interrupt && _isSpeaking) {
         await _tts.stop();
       }
-      
+
       await _tts.speak(text);
     } catch (e) {
       debugPrint('Failed to speak text: $e');
@@ -437,33 +450,33 @@ class AccessibilityService {
   Future<void> enableVoiceControl() async {
     _voiceControlEnabled = true;
     await _prefs.setBool('voice_control_enabled', true);
-    
+
     // Set up default voice commands
     _setupDefaultVoiceCommands();
-    
+
     _notifySettingsChange();
   }
 
   Future<void> disableVoiceControl() async {
     _voiceControlEnabled = false;
     await _prefs.setBool('voice_control_enabled', false);
-    
+
     if (_isListening) {
       await stopListening();
     }
-    
+
     _notifySettingsChange();
   }
 
   Future<void> startListening() async {
     if (!_voiceControlEnabled || !_speechToText.isAvailable) return;
-    
+
     try {
       await _speechToText.listen(
         onResult: (result) {
           _recognizedText = result.recognizedWords;
           _recognitionController.add(_recognizedText);
-          
+
           if (result.finalResult) {
             _processVoiceCommand(_recognizedText);
           }
@@ -486,13 +499,13 @@ class AccessibilityService {
 
   void _setupDefaultVoiceCommands() {
     _voiceCommands.clear();
-    
+
     // Navigation commands
     registerVoiceCommand('go home', () => debugPrint('Navigate to home'));
     registerVoiceCommand('go back', () => debugPrint('Navigate back'));
     registerVoiceCommand('open menu', () => debugPrint('Open menu'));
     registerVoiceCommand('close menu', () => debugPrint('Close menu'));
-    
+
     // Accessibility commands
     registerVoiceCommand('read page', () => _readCurrentPage());
     registerVoiceCommand('stop reading', () => stopSpeaking());
@@ -504,7 +517,7 @@ class AccessibilityService {
 
   void _processVoiceCommand(String recognizedText) {
     final command = recognizedText.toLowerCase().trim();
-    
+
     for (final voiceCommand in _voiceCommands.keys) {
       if (command.contains(voiceCommand)) {
         _voiceCommands[voiceCommand]?.call();
@@ -512,7 +525,7 @@ class AccessibilityService {
         return;
       }
     }
-    
+
     // If no exact match, try fuzzy matching
     final bestMatch = _findBestCommandMatch(command);
     if (bestMatch != null) {
@@ -525,9 +538,9 @@ class AccessibilityService {
 
   String? _findBestCommandMatch(String input) {
     // Simple fuzzy matching implementation
-    int bestScore = 0;
+    double bestScore = 0.0;
     String? bestMatch;
-    
+
     for (final command in _voiceCommands.keys) {
       final score = _calculateSimilarity(input, command);
       if (score > bestScore && score > 0.7) {
@@ -535,7 +548,7 @@ class AccessibilityService {
         bestMatch = command;
       }
     }
-    
+
     return bestMatch;
   }
 
@@ -545,15 +558,15 @@ class AccessibilityService {
       a.length + 1,
       (i) => List.generate(b.length + 1, (j) => 0),
     );
-    
+
     for (int i = 0; i <= a.length; i++) {
       matrix[i][0] = i;
     }
-    
+
     for (int j = 0; j <= b.length; j++) {
       matrix[0][j] = j;
     }
-    
+
     for (int i = 1; i <= a.length; i++) {
       for (int j = 1; j <= b.length; j++) {
         final cost = a[i - 1] == b[j - 1] ? 0 : 1;
@@ -564,7 +577,7 @@ class AccessibilityService {
         ].reduce((a, b) => a < b ? a : b);
       }
     }
-    
+
     final maxLength = a.length > b.length ? a.length : b.length;
     return 1.0 - (matrix[a.length][b.length] / maxLength);
   }
@@ -586,21 +599,21 @@ class AccessibilityService {
   Future<void> enableCognitiveAssistance() async {
     _cognitiveAssistanceEnabled = true;
     await _prefs.setBool('cognitive_assistance_enabled', true);
-    
+
     // Enable related features
     _simplifiedInterfaceEnabled = true;
     _memoryAidsEnabled = true;
-    
+
     _notifySettingsChange();
   }
 
   Future<void> disableCognitiveAssistance() async {
     _cognitiveAssistanceEnabled = false;
     await _prefs.setBool('cognitive_assistance_enabled', false);
-    
+
     _simplifiedInterfaceEnabled = false;
     _memoryAidsEnabled = false;
-    
+
     _notifySettingsChange();
   }
 
@@ -608,10 +621,10 @@ class AccessibilityService {
   Future<void> enableMotorAssistance() async {
     _motorAssistanceEnabled = true;
     await _prefs.setBool('motor_assistance_enabled', true);
-    
+
     // Configure dwell time
     _dwellTime = _currentProfile?.customizations['dwell_time'] ?? 1.0;
-    
+
     _notifySettingsChange();
   }
 
@@ -631,20 +644,20 @@ class AccessibilityService {
   Future<void> enableSeizureProtection() async {
     _seizureProtectionEnabled = true;
     _reduceMotionEnabled = true;
-    
+
     await _prefs.setBool('seizure_protection_enabled', true);
     await _prefs.setBool('reduce_motion_enabled', true);
-    
+
     _notifySettingsChange();
   }
 
   Future<void> disableSeizureProtection() async {
     _seizureProtectionEnabled = false;
     _reduceMotionEnabled = false;
-    
+
     await _prefs.setBool('seizure_protection_enabled', false);
     await _prefs.setBool('reduce_motion_enabled', false);
-    
+
     _notifySettingsChange();
   }
 
@@ -676,10 +689,10 @@ class AccessibilityService {
     _cognitiveAssistanceEnabled = false;
     _motorAssistanceEnabled = false;
     _seizureProtectionEnabled = false;
-    
+
     await _prefs.clear();
     _currentProfile = null;
-    
+
     _notifySettingsChange();
     _profileController.add(null);
   }
@@ -708,26 +721,28 @@ class AccessibilityService {
   // Helper methods for profile creation
   List<DisabilityType> _analyzeDisabilityTypes(Map<String, dynamic> data) {
     final types = <DisabilityType>[];
-    
+
     if (data['visual_impairment'] == true) types.add(DisabilityType.visual);
     if (data['hearing_impairment'] == true) types.add(DisabilityType.hearing);
     if (data['motor_impairment'] == true) types.add(DisabilityType.motor);
-    if (data['cognitive_impairment'] == true) types.add(DisabilityType.cognitive);
+    if (data['cognitive_impairment'] == true)
+      types.add(DisabilityType.cognitive);
     if (data['speech_impairment'] == true) types.add(DisabilityType.speech);
-    
+
     if (types.length > 1) types.add(DisabilityType.multiple);
-    
+
     return types;
   }
 
-  Map<DisabilityType, String> _determineSeverityLevels(Map<String, dynamic> data) {
+  Map<DisabilityType, String> _determineSeverityLevels(
+      Map<String, dynamic> data) {
     final levels = <DisabilityType, String>{};
-    
+
     for (final type in DisabilityType.values) {
       final key = '${type.toString().split('.').last}_severity';
       levels[type] = data[key] ?? 'mild';
     }
-    
+
     return levels;
   }
 
@@ -736,7 +751,7 @@ class AccessibilityService {
     Map<DisabilityType, String> severities,
   ) {
     final features = <AccessibilityFeature>[];
-    
+
     for (final type in types) {
       switch (type) {
         case DisabilityType.visual:
@@ -773,40 +788,41 @@ class AccessibilityService {
           break;
       }
     }
-    
+
     return features.toSet().toList();
   }
 
   List<String> _detectAssistiveTechnologies(Map<String, dynamic> data) {
     final technologies = <String>[];
-    
+
     if (data['screen_reader'] == true) technologies.add('screen_reader');
     if (data['switch_control'] == true) technologies.add('switch_control');
     if (data['eye_tracking'] == true) technologies.add('eye_tracking');
     if (data['voice_control'] == true) technologies.add('voice_control');
-    
+
     return technologies;
   }
 
-  Map<String, dynamic> _generateDefaultCustomizations(List<DisabilityType> types) {
+  Map<String, dynamic> _generateDefaultCustomizations(
+      List<DisabilityType> types) {
     final customizations = <String, dynamic>{};
-    
+
     if (types.contains(DisabilityType.visual)) {
       customizations['font_size'] = 1.2;
       customizations['color_scheme'] = 'high_contrast';
       customizations['speech_rate'] = 0.5;
     }
-    
+
     if (types.contains(DisabilityType.motor)) {
       customizations['dwell_time'] = 1.0;
       customizations['switch_scan_speed'] = 'medium';
     }
-    
+
     if (types.contains(DisabilityType.cognitive)) {
       customizations['simplified_interface'] = true;
       customizations['memory_aids'] = true;
     }
-    
+
     return customizations;
   }
 

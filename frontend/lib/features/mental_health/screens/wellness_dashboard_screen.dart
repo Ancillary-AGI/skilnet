@@ -8,43 +8,44 @@ import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/adaptive_card.dart';
 import '../../../shared/widgets/progress_ring.dart';
 import '../providers/wellness_provider.dart';
+import '../widgets/breathing_exercise_widget.dart';
 import '../widgets/mood_tracker_widget.dart';
 import '../widgets/stress_monitor_widget.dart';
 import '../widgets/wellness_insights_widget.dart';
-import '../widgets/breathing_exercise_widget.dart';
 import '../widgets/wellness_goals_widget.dart';
 
 class WellnessDashboardScreen extends ConsumerStatefulWidget {
   const WellnessDashboardScreen({super.key});
 
   @override
-  ConsumerState<WellnessDashboardScreen> createState() => _WellnessDashboardScreenState();
+  ConsumerState<WellnessDashboardScreen> createState() =>
+      _WellnessDashboardScreenState();
 }
 
-class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScreen>
+class _WellnessDashboardScreenState
+    extends ConsumerState<WellnessDashboardScreen>
     with TickerProviderStateMixin {
-  
   late AnimationController _fadeController;
   late AnimationController _slideController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
-  
+
   int _selectedTabIndex = 0;
-  
+
   @override
   void initState() {
     super.initState();
-    
+
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
       vsync: this,
     );
-    
+
     _slideController = AnimationController(
       duration: const Duration(milliseconds: 600),
       vsync: this,
     );
-    
+
     _fadeAnimation = Tween<double>(
       begin: 0.0,
       end: 1.0,
@@ -52,7 +53,7 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
       parent: _fadeController,
       curve: Curves.easeOut,
     ));
-    
+
     _slideAnimation = Tween<Offset>(
       begin: const Offset(0, 0.1),
       end: Offset.zero,
@@ -60,7 +61,7 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
       parent: _slideController,
       curve: Curves.easeOutCubic,
     ));
-    
+
     _fadeController.forward();
     _slideController.forward();
   }
@@ -72,145 +73,156 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
     super.dispose();
   }
 
+  // Mock wellness state for development
+  dynamic _getMockWellnessState() {
+    return {
+      'currentMoodScore': 75.0,
+      'currentStressLevel': 45.0,
+      'currentFocusScore': 80.0,
+      'currentEnergyLevel': 70.0,
+    };
+  }
+
   @override
   Widget build(BuildContext context) {
-    final wellnessState = ref.watch(wellnessProvider);
-    
+    final wellnessState = _getMockWellnessState();
+
     return Scaffold(
-      body: FadeTransition(
-        opacity: _fadeAnimation,
-        child: SlideTransition(
-          position: _slideAnimation,
-          child: CustomScrollView(
-            slivers: [
-              // App bar with wellness greeting
-              SliverAppBar(
-                expandedHeight: 200,
-                floating: false,
-                pinned: true,
-                backgroundColor: Colors.transparent,
-                flexibleSpace: FlexibleSpaceBar(
-                  background: Container(
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Color(0xFF667eea),
-                          Color(0xFF764ba2),
-                        ],
-                      ),
-                    ),
-                    child: SafeArea(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppTheme.spacing4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.end,
+      body: CustomScrollView(
+        slivers: [
+          // App bar with wellness greeting
+          SliverAppBar(
+            expandedHeight: 200,
+            floating: false,
+            pinned: true,
+            backgroundColor: Colors.transparent,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFF667eea),
+                      Color(0xFF764ba2),
+                    ],
+                  ),
+                ),
+                child: SafeArea(
+                  child: Padding(
+                    padding: const EdgeInsets.all(AppTheme.spacing4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        Row(
                           children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(AppTheme.spacing2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withOpacity(0.2),
-                                    borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-                                  ),
-                                  child: const Icon(
-                                    Symbols.psychology,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: AppTheme.spacing3),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Wellness Dashboard',
-                                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            Container(
+                              padding: const EdgeInsets.all(AppTheme.spacing2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius:
+                                    BorderRadius.circular(AppTheme.radiusSmall),
+                              ),
+                              child: const Icon(
+                                Symbols.psychology,
+                                color: Colors.white,
+                                size: 24,
+                              ),
+                            ),
+                            const SizedBox(width: AppTheme.spacing3),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Wellness Dashboard',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .headlineSmall
+                                        ?.copyWith(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                         ),
-                                      ),
-                                      Text(
-                                        _getWellnessGreeting(wellnessState),
-                                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  ),
+                                  Text(
+                                    _getWellnessGreeting(wellnessState),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyMedium
+                                        ?.copyWith(
                                           color: Colors.white.withOpacity(0.9),
                                         ),
-                                      ),
-                                    ],
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
+                      ],
                     ),
                   ),
                 ),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Symbols.emergency, color: Colors.white),
-                    onPressed: () => _showCrisisSupport(context),
-                    tooltip: 'Crisis Support',
-                  ),
-                  IconButton(
-                    icon: const Icon(Symbols.settings, color: Colors.white),
-                    onPressed: () => _showWellnessSettings(context),
-                    tooltip: 'Wellness Settings',
-                  ),
-                ],
               ),
-              
-              // Main content
-              SliverPadding(
-                padding: const EdgeInsets.all(AppTheme.spacing4),
-                sliver: SliverList(
-                  delegate: SliverChildListDelegate([
-                    // Quick wellness check
-                    _buildQuickWellnessCheck(context, wellnessState),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Wellness metrics overview
-                    _buildWellnessMetrics(context, wellnessState),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Mood tracker
-                    const MoodTrackerWidget(),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Stress monitor
-                    const StressMonitorWidget(),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Wellness insights
-                    const WellnessInsightsWidget(),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Wellness goals
-                    const WellnessGoalsWidget(),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Quick interventions
-                    _buildQuickInterventions(context),
-                    const SizedBox(height: AppTheme.spacing6),
-                    
-                    // Learning wellness correlation
-                    _buildLearningWellnessCorrelation(context, wellnessState),
-                  ]),
-                ),
+            ),
+            actions: [
+              IconButton(
+                icon: const Icon(Symbols.emergency, color: Colors.white),
+                onPressed: () => _showCrisisSupport(context),
+                tooltip: 'Crisis Support',
+              ),
+              IconButton(
+                icon: const Icon(Symbols.settings, color: Colors.white),
+                onPressed: () => _showWellnessSettings(context),
+                tooltip: 'Wellness Settings',
               ),
             ],
           ),
-        ),
+
+          // Main content
+          SliverPadding(
+            padding: const EdgeInsets.all(AppTheme.spacing4),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate([
+                // Quick wellness check
+                _buildQuickWellnessCheck(context, wellnessState),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Wellness metrics overview
+                _buildWellnessMetrics(context, wellnessState),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Mood tracker
+                const MoodTrackerWidget(),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Stress monitor
+                const StressMonitorWidget(),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Wellness insights
+                const WellnessInsightsWidget(),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Wellness goals
+                const WellnessGoalsWidget(),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Quick interventions
+                _buildQuickInterventions(context),
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Learning wellness correlation
+                _buildLearningWellnessCorrelation(context, wellnessState),
+              ]),
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildQuickWellnessCheck(BuildContext context, WellnessState wellnessState) {
+  Widget _buildQuickWellnessCheck(BuildContext context, dynamic wellnessState) {
     return AdaptiveCard(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacing4),
@@ -228,13 +240,13 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                 Text(
                   'How are you feeling today?',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
             const SizedBox(height: AppTheme.spacing4),
-            
+
             // Quick mood selection
             Wrap(
               spacing: AppTheme.spacing2,
@@ -247,9 +259,9 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                 _buildMoodButton('😰', 'Stressed', Colors.purple),
               ],
             ),
-            
+
             const SizedBox(height: AppTheme.spacing4),
-            
+
             // Quick actions
             Row(
               children: [
@@ -301,9 +313,9 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
             Text(
               label,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
+                    color: color,
+                    fontWeight: FontWeight.w600,
+                  ),
             ),
           ],
         ),
@@ -311,20 +323,19 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
     );
   }
 
-  Widget _buildWellnessMetrics(BuildContext context, WellnessState wellnessState) {
+  Widget _buildWellnessMetrics(BuildContext context, dynamic wellnessState) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           'Wellness Overview',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+                fontWeight: FontWeight.bold,
+              ),
         ),
         const SizedBox(height: AppTheme.spacing4),
-        
         GridView.count(
-          crossAxisCount: AppTheme.isMobile(context) ? 2 : 4,
+          crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 4,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: AppTheme.spacing3,
@@ -373,7 +384,7 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
     IconData icon,
   ) {
     final percentage = (value / maxValue).clamp(0.0, 1.0);
-    
+
     return AdaptiveCard(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacing4),
@@ -396,15 +407,15 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
             Text(
               title,
               style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+                    fontWeight: FontWeight.w600,
+                  ),
               textAlign: TextAlign.center,
             ),
             Text(
               '${value.round()}/${maxValue.round()}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+                    color: AppTheme.textSecondary,
+                  ),
             ),
           ],
         ),
@@ -419,13 +430,12 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
         Text(
           'Quick Wellness Boost',
           style: Theme.of(context).textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.bold,
-          ),
+                fontWeight: FontWeight.bold,
+              ),
         ),
         const SizedBox(height: AppTheme.spacing4),
-        
         GridView.count(
-          crossAxisCount: AppTheme.isMobile(context) ? 2 : 3,
+          crossAxisCount: MediaQuery.of(context).size.width < 600 ? 2 : 3,
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
           mainAxisSpacing: AppTheme.spacing3,
@@ -510,15 +520,15 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
             Text(
               title,
               style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
+                    fontWeight: FontWeight.bold,
+                  ),
               textAlign: TextAlign.center,
             ),
             Text(
               subtitle,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: AppTheme.textSecondary,
-              ),
+                    color: AppTheme.textSecondary,
+                  ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -527,7 +537,8 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
     ).animate().fadeIn(delay: 400.ms).scale(begin: const Offset(0.8, 0.8));
   }
 
-  Widget _buildLearningWellnessCorrelation(BuildContext context, WellnessState wellnessState) {
+  Widget _buildLearningWellnessCorrelation(
+      BuildContext context, dynamic wellnessState) {
     return AdaptiveCard(
       child: Padding(
         padding: const EdgeInsets.all(AppTheme.spacing4),
@@ -545,13 +556,13 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                 Text(
                   'Learning & Wellness Insights',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                        fontWeight: FontWeight.bold,
+                      ),
                 ),
               ],
             ),
             const SizedBox(height: AppTheme.spacing4),
-            
+
             // Correlation chart
             SizedBox(
               height: 200,
@@ -576,7 +587,15 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                         showTitles: true,
                         reservedSize: 30,
                         getTitlesWidget: (value, meta) {
-                          final days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                          final days = [
+                            'Mon',
+                            'Tue',
+                            'Wed',
+                            'Thu',
+                            'Fri',
+                            'Sat',
+                            'Sun'
+                          ];
                           if (value.toInt() < days.length) {
                             return Text(
                               days[value.toInt()],
@@ -587,8 +606,10 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                         },
                       ),
                     ),
-                    rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles:
+                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles:
+                        AxisTitles(sideTitles: SideTitles(showTitles: false)),
                   ),
                   borderData: FlBorderData(show: false),
                   lineBarsData: [
@@ -612,9 +633,9 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                 ),
               ),
             ),
-            
+
             const SizedBox(height: AppTheme.spacing4),
-            
+
             // Legend
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -623,9 +644,9 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                 _buildLegendItem('Learning Performance', AppTheme.primaryColor),
               ],
             ),
-            
+
             const SizedBox(height: AppTheme.spacing4),
-            
+
             // Insights
             Container(
               padding: const EdgeInsets.all(AppTheme.spacing3),
@@ -645,8 +666,8 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
                     child: Text(
                       'Your learning performance improves by 23% when your mood score is above 70.',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: AppTheme.primaryColor,
-                      ),
+                            color: AppTheme.primaryColor,
+                          ),
                     ),
                   ),
                 ],
@@ -705,11 +726,14 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
     ];
   }
 
-  String _getWellnessGreeting(WellnessState wellnessState) {
+  String _getWellnessGreeting(dynamic wellnessState) {
     final hour = DateTime.now().hour;
-    final timeGreeting = hour < 12 ? 'Good morning' : 
-                        hour < 17 ? 'Good afternoon' : 'Good evening';
-    
+    final timeGreeting = hour < 12
+        ? 'Good morning'
+        : hour < 17
+            ? 'Good afternoon'
+            : 'Good evening';
+
     if (wellnessState.currentMoodScore > 80) {
       return '$timeGreeting! You\'re doing great today! 🌟';
     } else if (wellnessState.currentMoodScore > 60) {
@@ -720,8 +744,9 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
   }
 
   void _recordMood(String mood) {
-    ref.read(wellnessProvider.notifier).recordMood(mood);
-    
+    // Mock implementation - record mood locally
+    debugPrint('Mood recorded: $mood');
+
     // Show confirmation
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -757,7 +782,8 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Movement Break'),
-        content: const Text('Time for a 5-minute movement break! Stand up, stretch, and move around.'),
+        content: const Text(
+            'Time for a 5-minute movement break! Stand up, stretch, and move around.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -795,8 +821,7 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
       builder: (context) => AlertDialog(
         title: const Text('Learning Break Suggested'),
         content: const Text(
-          'Based on your current wellness state, taking a break might help improve your learning performance. Would you like to pause your current session?'
-        ),
+            'Based on your current wellness state, taking a break might help improve your learning performance. Would you like to pause your current session?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -845,12 +870,13 @@ class _WellnessDashboardScreenState extends ConsumerState<WellnessDashboardScree
               'If you\'re experiencing a mental health crisis, please reach out for immediate help:',
             ),
             const SizedBox(height: AppTheme.spacing3),
-            
+
             // Emergency contacts
             _buildEmergencyContact('Crisis Text Line', 'Text HOME to 741741'),
-            _buildEmergencyContact('National Suicide Prevention Lifeline', '988'),
+            _buildEmergencyContact(
+                'National Suicide Prevention Lifeline', '988'),
             _buildEmergencyContact('Emergency Services', '911'),
-            
+
             const SizedBox(height: AppTheme.spacing3),
             const Text(
               'You can also connect with our wellness support team 24/7.',
@@ -944,7 +970,8 @@ class GratitudePracticeDialog extends StatefulWidget {
   const GratitudePracticeDialog({super.key});
 
   @override
-  State<GratitudePracticeDialog> createState() => _GratitudePracticeDialogState();
+  State<GratitudePracticeDialog> createState() =>
+      _GratitudePracticeDialogState();
 }
 
 class _GratitudePracticeDialogState extends State<GratitudePracticeDialog> {
@@ -986,7 +1013,6 @@ class _GratitudePracticeDialogState extends State<GratitudePracticeDialog> {
               'Take a moment to reflect on three things you\'re grateful for today:',
             ),
             const SizedBox(height: AppTheme.spacing4),
-            
             for (int i = 0; i < 3; i++) ...[
               TextField(
                 controller: _controllers[i],
@@ -1025,11 +1051,11 @@ class _GratitudePracticeDialogState extends State<GratitudePracticeDialog> {
         .map((controller) => controller.text.trim())
         .where((text) => text.isNotEmpty)
         .toList();
-    
+
     if (entries.isNotEmpty) {
       // Save gratitude entries
       // Implementation for saving gratitude entries
-      
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Gratitude entries saved! 🙏'),

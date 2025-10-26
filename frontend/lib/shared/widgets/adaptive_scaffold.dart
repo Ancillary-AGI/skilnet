@@ -1,9 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:material_symbols_icons/symbols.dart';
-
 import '../../core/theme/app_theme.dart';
-import '../../core/router/app_router.dart';
 
 class AdaptiveScaffold extends StatelessWidget {
   final Widget child;
@@ -18,7 +14,7 @@ class AdaptiveScaffold extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    
+
     // Mobile layout with bottom navigation
     if (screenWidth < 600) {
       return Scaffold(
@@ -26,7 +22,7 @@ class AdaptiveScaffold extends StatelessWidget {
         bottomNavigationBar: _buildBottomNavigationBar(context),
       );
     }
-    
+
     // Tablet layout with navigation rail
     if (screenWidth < 1200) {
       return Scaffold(
@@ -38,7 +34,7 @@ class AdaptiveScaffold extends StatelessWidget {
         ),
       );
     }
-    
+
     // Desktop layout with navigation drawer
     return Scaffold(
       body: Row(
@@ -52,62 +48,96 @@ class AdaptiveScaffold extends StatelessWidget {
 
   Widget _buildBottomNavigationBar(BuildContext context) {
     final currentIndex = _getCurrentIndex(currentLocation);
-    
+
     return NavigationBar(
       selectedIndex: currentIndex,
       onDestinationSelected: (index) {
-        final route = mainRoutes[index];
-        context.go(route.path);
+        // Simple navigation for demo
+        if (index == 0) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else if (index == 1) {
+          Navigator.of(context).pushReplacementNamed('/courses');
+        } else if (index == 2) {
+          Navigator.of(context).pushReplacementNamed('/profile');
+        }
       },
-      destinations: mainRoutes.map((route) {
-        return NavigationDestination(
-          icon: Icon(route.icon),
-          selectedIcon: Icon(route.selectedIcon ?? route.icon),
-          label: route.label,
-        );
-      }).toList(),
+      destinations: const [
+        NavigationDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: 'Home',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.school_outlined),
+          selectedIcon: Icon(Icons.school),
+          label: 'Courses',
+        ),
+        NavigationDestination(
+          icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person),
+          label: 'Profile',
+        ),
+      ],
     );
   }
 
   Widget _buildNavigationRail(BuildContext context) {
     final currentIndex = _getCurrentIndex(currentLocation);
-    
+
     return NavigationRail(
       selectedIndex: currentIndex,
       onDestinationSelected: (index) {
-        final route = mainRoutes[index];
-        context.go(route.path);
+        // Simple navigation for demo
+        if (index == 0) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        } else if (index == 1) {
+          Navigator.of(context).pushReplacementNamed('/courses');
+        } else if (index == 2) {
+          Navigator.of(context).pushReplacementNamed('/profile');
+        }
       },
       labelType: NavigationRailLabelType.all,
       backgroundColor: Theme.of(context).colorScheme.surface,
-      destinations: mainRoutes.map((route) {
-        return NavigationRailDestination(
-          icon: Icon(route.icon),
-          selectedIcon: Icon(route.selectedIcon ?? route.icon),
-          label: Text(route.label),
-        );
-      }).toList(),
+      destinations: const [
+        NavigationRailDestination(
+          icon: Icon(Icons.home_outlined),
+          selectedIcon: Icon(Icons.home),
+          label: Text('Home'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.school_outlined),
+          selectedIcon: Icon(Icons.school),
+          label: Text('Courses'),
+        ),
+        NavigationRailDestination(
+          icon: Icon(Icons.person_outline),
+          selectedIcon: Icon(Icons.person),
+          label: Text('Profile'),
+        ),
+      ],
       trailing: Expanded(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
-            // Quick action buttons
             IconButton(
-              icon: const Icon(Symbols.view_in_ar),
-              onPressed: () => _showVRQuickAccess(context),
-              tooltip: 'VR Classroom',
-            ),
-            IconButton(
-              icon: const Icon(Symbols.psychology),
-              onPressed: () => context.go('/ai-tutor'),
+              icon: const Icon(Icons.psychology),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('AI Tutor coming soon!')),
+                );
+              },
               tooltip: 'AI Tutor',
             ),
             IconButton(
-              icon: const Icon(Symbols.settings),
-              onPressed: () => context.go('/profile/settings'),
+              icon: const Icon(Icons.settings),
+              onPressed: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Settings coming soon!')),
+                );
+              },
               tooltip: 'Settings',
             ),
-            const SizedBox(height: AppTheme.spacing4),
+            const SizedBox(height: 16),
           ],
         ),
       ),
@@ -131,7 +161,7 @@ class AdaptiveScaffold extends StatelessWidget {
           // App header
           Container(
             height: 120,
-            padding: const EdgeInsets.all(AppTheme.spacing4),
+            padding: const EdgeInsets.all(AppTheme.spacing6),
             decoration: BoxDecoration(
               gradient: AppTheme.primaryGradient,
             ),
@@ -142,15 +172,15 @@ class AdaptiveScaffold extends StatelessWidget {
                   height: 48,
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+                    borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(
-                    Symbols.school,
+                    Icons.school,
                     color: Colors.white,
                     size: 24,
                   ),
                 ),
-                const SizedBox(width: AppTheme.spacing3),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -159,15 +189,15 @@ class AdaptiveScaffold extends StatelessWidget {
                       Text(
                         'EduVerse',
                         style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
                       ),
                       Text(
                         'Future of Learning',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Colors.white.withOpacity(0.8),
-                        ),
+                              color: Colors.white.withOpacity(0.8),
+                            ),
                       ),
                     ],
                   ),
@@ -175,74 +205,84 @@ class AdaptiveScaffold extends StatelessWidget {
               ],
             ),
           ),
-          
+
           // Navigation items
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing2),
+              padding: const EdgeInsets.symmetric(vertical: 8),
               children: [
                 // Main navigation
-                ...mainRoutes.map((route) => _buildDrawerItem(
+                _buildDrawerItem(
                   context,
-                  route.label,
-                  route.icon,
-                  route.selectedIcon ?? route.icon,
-                  route.path,
-                  currentLocation == route.path,
-                )),
-                
-                const Divider(height: AppTheme.spacing6),
-                
+                  'Home',
+                  Icons.home_outlined,
+                  Icons.home,
+                  '/home',
+                  currentLocation == '/home',
+                ),
+                _buildDrawerItem(
+                  context,
+                  'Courses',
+                  Icons.school_outlined,
+                  Icons.school,
+                  '/courses',
+                  currentLocation == '/courses',
+                ),
+                _buildDrawerItem(
+                  context,
+                  'AI Tutor',
+                  Icons.psychology_outlined,
+                  Icons.psychology,
+                  '/ai-tutor',
+                  currentLocation == '/ai-tutor',
+                ),
+                _buildDrawerItem(
+                  context,
+                  'Profile',
+                  Icons.person_outline,
+                  Icons.person,
+                  '/profile',
+                  currentLocation == '/profile',
+                ),
+
+                const Divider(),
+
                 // Extended navigation
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing4),
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: Text(
                     'More',
                     style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: AppTheme.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
+                          color: AppTheme.textSecondary,
+                          fontWeight: FontWeight.w600,
+                        ),
                   ),
                 ),
-                const SizedBox(height: AppTheme.spacing2),
-                
-                ...extendedRoutes.map((route) => _buildDrawerItem(
-                  context,
-                  route.label,
-                  route.icon,
-                  route.selectedIcon ?? route.icon,
-                  route.path,
-                  currentLocation == route.path,
-                )),
-                
-                const Divider(height: AppTheme.spacing6),
-                
-                // Quick actions
+                const SizedBox(height: 8),
+
                 _buildDrawerItem(
                   context,
                   'VR Classroom',
-                  Symbols.view_in_ar,
-                  Symbols.view_in_ar,
-                  '/vr-classroom/quick',
+                  Icons.meeting_room,
+                  Icons.meeting_room,
+                  '/vr-classroom',
                   false,
-                  color: FeatureColors.vrClassroom,
                 ),
                 _buildDrawerItem(
                   context,
                   'Live Classes',
-                  Symbols.video_call,
-                  Symbols.video_call,
-                  '/live-class/browse',
+                  Icons.video_call,
+                  Icons.video_call,
+                  '/live-class',
                   false,
-                  color: FeatureColors.liveClass,
                 ),
               ],
             ),
           ),
-          
+
           // User section
           Container(
-            padding: const EdgeInsets.all(AppTheme.spacing4),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
               border: Border(
                 top: BorderSide(
@@ -256,15 +296,15 @@ class AdaptiveScaffold extends StatelessWidget {
                 CircleAvatar(
                   radius: 20,
                   backgroundColor: AppTheme.primaryColor,
-                  child: Text(
+                  child: const Text(
                     'U',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-                const SizedBox(width: AppTheme.spacing3),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -276,15 +316,19 @@ class AdaptiveScaffold extends StatelessWidget {
                       Text(
                         'Level 5 • 2,450 XP',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textSecondary,
-                        ),
+                              color: AppTheme.textSecondary,
+                            ),
                       ),
                     ],
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Symbols.settings),
-                  onPressed: () => context.go('/profile/settings'),
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Settings coming soon!')),
+                    );
+                  },
                 ),
               ],
             ),
@@ -300,115 +344,46 @@ class AdaptiveScaffold extends StatelessWidget {
     IconData icon,
     IconData selectedIcon,
     String path,
-    bool isSelected, {
-    Color? color,
-  }) {
+    bool isSelected,
+  ) {
     return Container(
       margin: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacing2,
-        vertical: AppTheme.spacing1,
+        horizontal: 8,
+        vertical: 2,
       ),
       child: ListTile(
         leading: Icon(
           isSelected ? selectedIcon : icon,
-          color: isSelected 
-              ? (color ?? AppTheme.primaryColor)
-              : AppTheme.textSecondary,
+          color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
         ),
         title: Text(
           label,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: isSelected 
-                ? (color ?? AppTheme.primaryColor)
-                : AppTheme.textPrimary,
-            fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-          ),
+                color:
+                    isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+              ),
         ),
         selected: isSelected,
-        selectedTileColor: (color ?? AppTheme.primaryColor).withOpacity(0.1),
+        selectedTileColor: AppTheme.primaryColor.withOpacity(0.1),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+          borderRadius: BorderRadius.circular(12),
         ),
-        onTap: () => context.go(path),
+        onTap: () {
+          Navigator.of(context).pushReplacementNamed(path);
+        },
       ),
     );
   }
 
   int _getCurrentIndex(String location) {
-    for (int i = 0; i < mainRoutes.length; i++) {
-      if (location.startsWith(mainRoutes[i].path)) {
-        return i;
-      }
+    if (location.startsWith('/home')) {
+      return 0;
+    } else if (location.startsWith('/courses')) {
+      return 1;
+    } else if (location.startsWith('/profile')) {
+      return 2;
     }
     return 0;
-  }
-
-  void _showVRQuickAccess(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(AppTheme.spacing4),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppTheme.radiusLarge),
-          ),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.only(bottom: AppTheme.spacing4),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            Text(
-              'VR Quick Access',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            
-            ListTile(
-              leading: const Icon(Symbols.meeting_room, color: FeatureColors.vrClassroom),
-              title: const Text('Join Active Classroom'),
-              subtitle: const Text('3 active sessions'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/vr-classroom/active');
-              },
-            ),
-            
-            ListTile(
-              leading: const Icon(Symbols.science, color: FeatureColors.arExperience),
-              title: const Text('Virtual Lab'),
-              subtitle: const Text('Chemistry & Physics'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/vr-classroom/lab');
-              },
-            ),
-            
-            ListTile(
-              leading: const Icon(Symbols.explore, color: AppTheme.accentColor),
-              title: const Text('Explore Environments'),
-              subtitle: const Text('Browse VR worlds'),
-              onTap: () {
-                Navigator.pop(context);
-                context.go('/vr-classroom/explore');
-              },
-            ),
-            
-            const SizedBox(height: AppTheme.spacing4),
-          ],
-        ),
-      ),
-    );
   }
 }

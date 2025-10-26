@@ -11,8 +11,8 @@ T = TypeVar('T', bound='BaseModel')
 M = TypeVar('M', bound=PydanticBaseModel)
 
 # Database configuration and connection
-from backend.app.migrations.migration_manager import MigrationManager
-from backend.app.core.database import DatabaseConfig, DatabaseConnection, Field
+from app.migrations.migration_manager import MigrationManager
+from app.core.database import DatabaseConfig, DatabaseConnection, Field
 
 # Enums
 class RelationshipType(Enum):

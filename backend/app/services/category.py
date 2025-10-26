@@ -1,7 +1,6 @@
-# services/category_service.py
 from typing import List, Optional, Dict, Any
-from models.category import Category
-from schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse, CategoryTreeResponse
+from app.models.category import Category
+from app.schemas.category import CategoryCreate, CategoryUpdate, CategoryResponse, CategoryTreeResponse
 
 class CategoryService:
     

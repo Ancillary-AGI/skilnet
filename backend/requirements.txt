@@ -1,48 +1,41 @@
-fastapi==0.104.1
-uvicorn[standard]==0.24.0
-sqlmodel==0.0.14
-alembic==1.12.1
-psycopg2-binary==2.9.9
-pydantic==2.5.0
-pydantic-settings==2.1.0
+# Core FastAPI dependencies
+fastapi==0.115.0
+uvicorn[standard]==0.31.0
+pydantic==2.8.2
+pydantic-settings==2.4.0
+
+# Database
+sqlalchemy[asyncio]==2.0.35
+alembic==1.13.2
+
+# Authentication & Security
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.6
-redis==5.0.1
-celery==5.3.4
-websockets==12.0
-aiofiles==23.2.1
-pillow==10.1.0
-opencv-python==4.8.1.78
-tensorflow==2.15.0
-torch==2.1.1
-transformers==4.36.0
-diffusers==0.24.0
-accelerate==0.25.0
-pytest==7.4.3
-pytest-asyncio==0.21.1
-pytest-cov==4.1.0
-httpx==0.25.2
-factory-boy==3.3.0
-faker==20.1.0
-black==23.11.0
-isort==5.12.0
-flake8==6.1.0
-mypy==1.7.1
-pre-commit==3.6.0
+
+# Caching
+redis[hiredis]==5.0.8
+
+# Email
+jinja2==3.1.4
+
+# AI/ML (core)
+openai==1.51.0
+numpy==2.1.2
+
+# Image processing
+Pillow==11.0.0
+
+# WebRTC
+websockets==13.1
+
+# File storage
+boto3==1.35.34
+
+# Testing
+pytest==8.3.3
+pytest-asyncio==0.24.0
+httpx==0.27.2
+
+# Development
 python-dotenv==1.0.0
-cryptography==41.0.8
-webauthn==1.11.1
-qrcode==7.4.2
-speechrecognition==3.10.1
-pyttsx3==2.90
-gtts==2.5.1
-requests==2.31.0
-boto3==1.34.122
-botocore==1.34.122
-cloudflare==2.13.0
-azure-storage-blob==12.19.1
-asyncpg==0.29.0
-reportlab==4.1.0
-python-json-logger==2.0.7
-structlog==23.2.0

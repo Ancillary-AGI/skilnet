@@ -1,87 +1,132 @@
-import uuid
-from typing import Optional, Dict, Any
+"""
+User model for EduVerse platform
+"""
+
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON, Float
+from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
+from app.core.database import Base
 from datetime import datetime
-from enum import Enum
-from sqlmodel import SQLModel, Field
-from passlib.context import CryptContext
+from typing import Optional, Dict, Any
+import uuid
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-class UserRole(str, Enum):
-    STUDENT = "student"
-    INSTRUCTOR = "instructor"
-    ADMIN = "admin"
-    CONTENT_CREATOR = "content_creator"
-    AI_TRAINER = "ai_trainer"
-    MODERATOR = "moderator"
-
-class User(SQLModel, table=True):
-    """User model with core authentication fields"""
+class User(Base):
     __tablename__ = "users"
 
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()), primary_key=True)
-    email: str = Field(unique=True, index=True, nullable=False)
-    username: str = Field(unique=True, index=True, nullable=False)
-    password_hash: str = Field(nullable=False)
-    first_name: Optional[str] = Field(default=None)
-    last_name: Optional[str] = Field(default=None)
-    is_active: bool = Field(default=True)
-    is_verified: bool = Field(default=False)
-    is_superuser: bool = Field(default=False)
-    role: str = Field(default=UserRole.STUDENT.value)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    last_login: Optional[datetime] = Field(default=None)
-    login_count: int = Field(default=0)
-
-    @staticmethod
-    def hash_password(password: str) -> str:
-        """Hash password using bcrypt"""
-        return pwd_context.hash(password)
-
-    @staticmethod
-    def verify_password(plain_password: str, hashed_password: str) -> bool:
-        """Verify password against hash"""
-        return pwd_context.verify(plain_password, hashed_password)
-
-    def check_password(self, password: str) -> bool:
-        """Check if password matches user's hash"""
-        return self.verify_password(password, self.password_hash)
-
-    async def change_password(self, new_password: str):
-        """Change user password"""
-        self.password_hash = self.hash_password(new_password)
-        self.updated_at = datetime.utcnow()
-
-    def update_login_info(self):
-        """Update login information"""
-        self.last_login = datetime.utcnow()
-        self.login_count += 1
-        self.updated_at = datetime.utcnow()
-
-    @property
-    def full_name(self) -> str:
-        """Get user's full name"""
-        if self.first_name and self.last_name:
-            return f"{self.first_name} {self.last_name}"
-        return self.username
-
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    email = Column(String, unique=True, index=True, nullable=False)
+    username = Column(String, unique=True, index=True, nullable=True)
+    full_name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=True)
+    
+    # Profile information
+    avatar_url = Column(String, nullable=True)
+    bio = Column(Text, nullable=True)
+    date_of_birth = Column(DateTime, nullable=True)
+    country_code = Column(String(2), nullable=True)
+    timezone = Column(String, nullable=True)
+    language_preference = Column(String, default="en")
+    
+    # Account status
+    is_active = Column(Boolean, default=True)
+    is_verified = Column(Boolean, default=False)
+    is_premium = Column(Boolean, default=False)
+    is_instructor = Column(Boolean, default=False)
+    is_admin = Column(Boolean, default=False)
+    
+    # Social login
+    google_id = Column(String, nullable=True)
+    apple_id = Column(String, nullable=True)
+    facebook_id = Column(String, nullable=True)
+    
+    # Learning preferences
+    learning_style = Column(String, nullable=True)  # visual, auditory, kinesthetic
+    difficulty_preference = Column(String, default="intermediate")
+    daily_goal_minutes = Column(Integer, default=30)
+    
+    # Gamification
+    total_xp = Column(Integer, default=0)
+    current_level = Column(Integer, default=1)
+    current_streak = Column(Integer, default=0)
+    longest_streak = Column(Integer, default=0)
+    
+    # Accessibility
+    accessibility_settings = Column(JSON, nullable=True)
+    
+    # External IDs for payment processing
+    stripe_customer_id = Column(String, nullable=True)
+    paypal_customer_id = Column(String, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    last_login_at = Column(DateTime, nullable=True)
+    email_verified_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    # courses = relationship("Course", back_populates="instructor")
+    # enrollments = relationship("Enrollment", back_populates="user")
+    # subscriptions = relationship("Subscription", back_populates="user")
+    
+    def __repr__(self):
+        return f"<User(id={self.id}, email={self.email}, full_name={self.full_name})>"
+    
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary with core fields"""
+        """Convert user to dictionary"""
         return {
             "id": self.id,
             "email": self.email,
             "username": self.username,
-            "first_name": self.first_name,
-            "last_name": self.last_name,
             "full_name": self.full_name,
+            "avatar_url": self.avatar_url,
+            "bio": self.bio,
+            "country_code": self.country_code,
+            "language_preference": self.language_preference,
             "is_active": self.is_active,
             "is_verified": self.is_verified,
-            "role": self.role,
+            "is_premium": self.is_premium,
+            "is_instructor": self.is_instructor,
+            "total_xp": self.total_xp,
+            "current_level": self.current_level,
+            "current_streak": self.current_streak,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "last_login": self.last_login.isoformat() if self.last_login else None
+            "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
         }
-
-# Alias for backward compatibility
-BaseUser = User
+    
+    @property
+    def display_name(self) -> str:
+        """Get display name for user"""
+        return self.full_name or self.username or self.email.split("@")[0]
+    
+    @property
+    def is_social_user(self) -> bool:
+        """Check if user registered via social login"""
+        return bool(self.google_id or self.apple_id or self.facebook_id)
+    
+    def calculate_level(self) -> int:
+        """Calculate user level based on XP"""
+        if self.total_xp < 100:
+            return 1
+        return min(int(self.total_xp / 100) + 1, 100)
+    
+    def xp_to_next_level(self) -> int:
+        """Calculate XP needed for next level"""
+        current_level_xp = (self.current_level - 1) * 100
+        next_level_xp = self.current_level * 100
+        return next_level_xp - self.total_xp
+    
+    def add_xp(self, amount: int) -> bool:
+        """Add XP and check for level up"""
+        old_level = self.current_level
+        self.total_xp += amount
+        self.current_level = self.calculate_level()
+        return self.current_level > old_level
+    
+    def update_streak(self, completed_today: bool = True) -> None:
+        """Update learning streak"""
+        if completed_today:
+            self.current_streak += 1
+            if self.current_streak > self.longest_streak:
+                self.longest_streak = self.current_streak
+        else:
+            self.current_streak = 0

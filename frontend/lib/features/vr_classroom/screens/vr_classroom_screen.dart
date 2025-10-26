@@ -1,18 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:material_symbols_icons/symbols.dart';
-
 import '../../../core/theme/app_theme.dart';
-import '../../../shared/widgets/adaptive_card.dart';
-import '../../../shared/widgets/immersive_controls.dart';
-import '../../../shared/widgets/spatial_audio_controls.dart';
-import '../../../shared/widgets/vr_hand_tracking.dart';
-import '../providers/vr_classroom_provider.dart';
-import '../widgets/vr_environment_selector.dart';
-import '../widgets/vr_participant_list.dart';
-import '../widgets/vr_whiteboard.dart';
-import '../widgets/vr_3d_models.dart';
+import '../../../core/app_config.dart';
+import '../../../shared/widgets/adaptive_scaffold.dart';
+
+// Responsive value extension for BuildContext
+extension ResponsiveExtension on BuildContext {
+  T responsiveValue<T>({required T mobile, T? tablet, T? desktop}) {
+    final width = MediaQuery.of(this).size.width;
+
+    if (width >= AppConfig.desktopBreakpoint) {
+      return desktop ?? tablet ?? mobile;
+    } else if (width >= AppConfig.tabletBreakpoint) {
+      return tablet ?? mobile;
+    } else {
+      return mobile;
+    }
+  }
+}
 
 class VRClassroomScreen extends ConsumerStatefulWidget {
   final String roomId;
@@ -28,897 +35,667 @@ class VRClassroomScreen extends ConsumerStatefulWidget {
 
 class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
     with TickerProviderStateMixin {
-  late AnimationController _immersionController;
-  late Animation<double> _immersionAnimation;
-  
-  bool _isImmersiveMode = false;
-  bool _isHandTrackingEnabled = true;
-  bool _isSpatialAudioEnabled = true;
-  bool _isHapticsEnabled = true;
-  
-  String _selectedEnvironment = 'modern_classroom';
-  double _comfortLevel = 0.8;
+  late AnimationController _fadeController;
+  late AnimationController _scaleController;
+  late Animation<double> _fadeAnimation;
+  late Animation<double> _scaleAnimation;
 
   @override
   void initState() {
     super.initState();
-    _immersionController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+
+    _fadeController = AnimationController(
+      duration: AppTheme.normalAnimation,
       vsync: this,
     );
-    
-    _immersionAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _immersionController,
-      curve: Curves.easeInOutCubic,
-    ));
-    
-    // Initialize VR session
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(vrClassroomProvider.notifier).joinRoom(widget.roomId);
-    });
+
+    _scaleController = AnimationController(
+      duration: AppTheme.slowAnimation,
+      vsync: this,
+    );
+
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: AppTheme.defaultCurve),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 0.8, end: 1.0).animate(
+      CurvedAnimation(parent: _scaleController, curve: AppTheme.bounceCurve),
+    );
+
+    // Start animations
+    _fadeController.forward();
+    _scaleController.forward();
   }
 
   @override
   void dispose() {
-    _immersionController.dispose();
-    ref.read(vrClassroomProvider.notifier).leaveRoom();
+    _fadeController.dispose();
+    _scaleController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final vrState = ref.watch(vrClassroomProvider);
-    
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Stack(
-        children: [
-          // Main VR view
-          _buildVRView(context, vrState),
-          
-          // UI overlay
-          if (!_isImmersiveMode) _buildUIOverlay(context, vrState),
-          
-          // Immersive controls (always visible)
-          _buildImmersiveControls(context),
-          
-          // Hand tracking visualization
-          if (_isHandTrackingEnabled) _buildHandTrackingOverlay(context),
-          
-          // Loading overlay
-          if (vrState.isLoading) _buildLoadingOverlay(context),
-        ],
+    return AdaptiveScaffold(
+      currentLocation: '/vr-classroom/${widget.roomId}',
+      child: FadeTransition(
+        opacity: _fadeAnimation,
+        child: ScaleTransition(
+          scale: _scaleAnimation,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(AppTheme.spacing4),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // VR Classroom Header
+                _buildVRHeader(),
+
+                const SizedBox(height: AppTheme.spacing6),
+
+                // VR Controls
+                _buildVRControls(),
+
+                const SizedBox(height: AppTheme.spacing6),
+
+                // 3D Environment Preview
+                _buildEnvironmentPreview(),
+
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Participants Panel
+                _buildParticipantsPanel(),
+
+                const SizedBox(height: AppTheme.spacing6),
+
+                // Interactive Objects
+                _buildInteractiveObjects(),
+
+                const SizedBox(height: AppTheme.spacing6),
+
+                // VR Settings
+                _buildVRSettings(),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
 
-  Widget _buildVRView(BuildContext context, VRClassroomState vrState) {
+  Widget _buildVRHeader() {
     return Container(
-      width: double.infinity,
-      height: double.infinity,
+      padding: const EdgeInsets.all(AppTheme.spacing6),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            const Color(0xFF1a1a2e),
-            const Color(0xFF16213e),
-            const Color(0xFF0f3460),
+        gradient: AppTheme.heroGradient,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+        boxShadow: AppTheme.elevatedShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacing3),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                ),
+                child: const Icon(
+                  Icons.meeting_room,
+                  color: Colors.white,
+                  size: 32,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacing4),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Virtual Reality Classroom',
+                      style:
+                          Theme.of(context).textTheme.headlineMedium?.copyWith(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                    ),
+                    const SizedBox(height: AppTheme.spacing1),
+                    Text(
+                      'Room ID: ${widget.roomId}',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppTheme.spacing3,
+                  vertical: AppTheme.spacing2,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.green.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacing2),
+                    Text(
+                      'LIVE',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.green,
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppTheme.spacing6),
+
+          // VR Stats
+          Row(
+            children: [
+              _buildVRStat('Participants', '12', Icons.people),
+              const SizedBox(width: AppTheme.spacing6),
+              _buildVRStat('Duration', '45m', Icons.access_time),
+              const SizedBox(width: AppTheme.spacing6),
+              _buildVRStat('Environment', 'Lab', Icons.science),
+            ],
+          ),
+        ],
+      ),
+    ).animate().shimmer(duration: 2000.ms);
+  }
+
+  Widget _buildVRStat(String label, String value, IconData icon) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(AppTheme.spacing3),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: Colors.white, size: 20),
+            const SizedBox(height: AppTheme.spacing2),
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.white.withOpacity(0.8),
+                  ),
+            ),
           ],
         ),
       ),
-      child: Stack(
+    );
+  }
+
+  Widget _buildVRControls() {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacing5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 3D Environment simulation
-          _build3DEnvironment(context),
-          
-          // Participants avatars
-          _buildParticipantAvatars(context, vrState.participants),
-          
-          // Interactive objects
-          _buildInteractiveObjects(context),
-          
-          // Spatial UI elements
-          _buildSpatialUI(context),
+          Text(
+            'VR Controls',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          const SizedBox(height: AppTheme.spacing4),
+
+          // Control Grid
+          GridView.count(
+            crossAxisCount: context.responsiveValue(
+              mobile: 2,
+              tablet: 3,
+              desktop: 4,
+            ),
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisSpacing: AppTheme.spacing4,
+            mainAxisSpacing: AppTheme.spacing4,
+            children: [
+              _buildControlButton(
+                'Movement',
+                Icons.directions_walk,
+                'WASD Keys',
+                Colors.blue,
+              ),
+              _buildControlButton(
+                'Interact',
+                Icons.touch_app,
+                'E Key',
+                Colors.green,
+              ),
+              _buildControlButton(
+                'Voice',
+                Icons.mic,
+                'V Key',
+                Colors.purple,
+              ),
+              _buildControlButton(
+                'Menu',
+                Icons.menu,
+                'Tab Key',
+                Colors.orange,
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 
-  Widget _build3DEnvironment(BuildContext context) {
-    return AnimatedContainer(
-      duration: AppTheme.animationMedium,
-      width: double.infinity,
-      height: double.infinity,
+  Widget _buildControlButton(
+      String title, IconData icon, String shortcut, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacing4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: color, size: 32),
+          const SizedBox(height: AppTheme.spacing2),
+          Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+          Text(
+            shortcut,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppTheme.textSecondary,
+                ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEnvironmentPreview() {
+    return Container(
+      height: 200,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Colors.blue.shade100, Colors.purple.shade100],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+      ),
       child: Stack(
         children: [
-          // Environment background
-          Container(
-            decoration: BoxDecoration(
-              image: DecorationImage(
-                image: NetworkImage(_getEnvironmentImage(_selectedEnvironment)),
-                fit: BoxFit.cover,
-                colorFilter: ColorFilter.mode(
-                  Colors.blue.withOpacity(0.1),
-                  BlendMode.overlay,
-                ),
+          // 3D Grid Background
+          Positioned.fill(
+            child: CustomPaint(
+              painter: VRGridPainter(),
+            ),
+          ),
+
+          // VR Objects
+          Positioned(
+            left: 50,
+            top: 50,
+            child: _buildVRObject('Molecule', Icons.science, Colors.blue),
+          ),
+          Positioned(
+            right: 80,
+            top: 80,
+            child: _buildVRObject(
+                'Atom', Icons.radio_button_unchecked, Colors.green),
+          ),
+          Positioned(
+            bottom: 40,
+            left: 100,
+            child:
+                _buildVRObject('Lab Equipment', Icons.biotech, Colors.purple),
+          ),
+
+          // VR Camera Indicator
+          Positioned(
+            top: 16,
+            right: 16,
+            child: Container(
+              padding: const EdgeInsets.all(AppTheme.spacing2),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: AppTheme.spacing2),
+                  Text(
+                    'VR CAM',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                  ),
+                ],
               ),
             ),
           ),
-          
-          // 3D grid overlay for depth perception
-          CustomPaint(
-            size: Size.infinite,
-            painter: VRGridPainter(),
-          ),
-          
-          // Floating particles for immersion
-          ...List.generate(20, (index) => _buildFloatingParticle(index)),
         ],
       ),
     );
   }
 
-  Widget _buildFloatingParticle(int index) {
-    return Positioned(
-      left: (index * 50.0) % MediaQuery.of(context).size.width,
-      top: (index * 30.0) % MediaQuery.of(context).size.height,
-      child: Container(
-        width: 4,
-        height: 4,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.3),
-          shape: BoxShape.circle,
-        ),
-      ).animate(onPlay: (controller) => controller.repeat())
-        .fadeIn(duration: 2000.ms)
-        .fadeOut(delay: 1000.ms, duration: 1000.ms),
-    );
-  }
-
-  Widget _buildParticipantAvatars(BuildContext context, List<dynamic> participants) {
-    return Stack(
-      children: participants.asMap().entries.map((entry) {
-        final index = entry.key;
-        final participant = entry.value;
-        
-        // Position avatars in a circle around the room
-        final angle = (index * 2 * 3.14159) / participants.length;
-        final radius = 150.0;
-        final centerX = MediaQuery.of(context).size.width / 2;
-        final centerY = MediaQuery.of(context).size.height / 2;
-        
-        final x = centerX + radius * cos(angle) - 30;
-        final y = centerY + radius * sin(angle) - 30;
-        
-        return Positioned(
-          left: x,
-          top: y,
-          child: _buildParticipantAvatar(participant),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _buildParticipantAvatar(Map<String, dynamic> participant) {
+  Widget _buildVRObject(String name, IconData icon, Color color) {
     return Container(
       width: 60,
       height: 60,
       decoration: BoxDecoration(
+        color: color.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        boxShadow: [
+          BoxShadow(
+            color: color.withOpacity(0.3),
+            blurRadius: 8,
+            spreadRadius: 2,
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, color: Colors.white, size: 24),
+          const SizedBox(height: 2),
+          Text(
+            name,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+          ),
+        ],
+      ),
+    ).animate().scale(duration: 2000.ms, curve: Curves.easeInOut);
+  }
+
+  Widget _buildParticipantsPanel() {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacing5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Participants (12)',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              ElevatedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.person_add),
+                label: const Text('Invite'),
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: AppTheme.spacing4),
+
+          // Participants Grid
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: context.responsiveValue(
+                mobile: 3,
+                tablet: 4,
+                desktop: 6,
+              ),
+              crossAxisSpacing: AppTheme.spacing3,
+              mainAxisSpacing: AppTheme.spacing3,
+            ),
+            itemCount: 12,
+            itemBuilder: (context, index) {
+              return _buildParticipantAvatar(index);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildParticipantAvatar(int index) {
+    final isOnline = index < 8;
+    final isSpeaking = index == 2; // Simulate current speaker
+
+    return Container(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
         border: Border.all(
-          color: participant['isActive'] ? AppTheme.successColor : Colors.grey,
+          color: isSpeaking ? Colors.green : Colors.transparent,
           width: 3,
         ),
         boxShadow: [
           BoxShadow(
-            color: (participant['isActive'] ? AppTheme.successColor : Colors.grey)
-                .withOpacity(0.3),
-            blurRadius: 10,
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
             spreadRadius: 2,
           ),
         ],
       ),
       child: CircleAvatar(
-        backgroundImage: participant['avatarUrl'] != null
-            ? NetworkImage(participant['avatarUrl'])
-            : null,
-        child: participant['avatarUrl'] == null
-            ? Text(
-                participant['name']?.substring(0, 1).toUpperCase() ?? 'U',
-                style: const TextStyle(
-                  color: Colors.white,
+        radius: 24,
+        backgroundColor: isOnline ? Colors.blue : Colors.grey,
+        child: Text(
+          'U${index + 1}',
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInteractiveObjects() {
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacing5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+        boxShadow: AppTheme.cardShadow,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Interactive Objects',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
-              )
-            : null,
-      ),
-    ).animate().scale(delay: 500.ms, curve: Curves.elasticOut);
-  }
-
-  Widget _buildInteractiveObjects(BuildContext context) {
-    return Stack(
-      children: [
-        // Virtual whiteboard
-        Positioned(
-          top: 100,
-          left: 50,
-          child: VRWhiteboard(
-            onContentChanged: (content) {
-              ref.read(vrClassroomProvider.notifier).updateWhiteboard(content);
-            },
           ),
-        ),
-        
-        // 3D models
-        Positioned(
-          bottom: 150,
-          right: 50,
-          child: VR3DModels(
-            onModelInteraction: (modelId, interaction) {
-              ref.read(vrClassroomProvider.notifier).interactWithModel(modelId, interaction);
-            },
-          ),
-        ),
-        
-        // Interactive quiz panel
-        Positioned(
-          top: 200,
-          right: 100,
-          child: _buildInteractiveQuiz(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildInteractiveQuiz() {
-    return Container(
-      width: 200,
-      padding: const EdgeInsets.all(AppTheme.spacing4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.9),
-        borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-        border: Border.all(color: AppTheme.primaryColor, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: AppTheme.primaryColor.withOpacity(0.3),
-            blurRadius: 15,
-            spreadRadius: 2,
+          const SizedBox(height: AppTheme.spacing4),
+          Wrap(
+            spacing: AppTheme.spacing3,
+            runSpacing: AppTheme.spacing3,
+            children: [
+              _buildInteractiveObject(
+                  'Periodic Table', Icons.table_chart, Colors.blue),
+              _buildInteractiveObject(
+                  '3D Models', Icons.view_in_ar, Colors.green),
+              _buildInteractiveObject('Whiteboard', Icons.draw, Colors.purple),
+              _buildInteractiveObject(
+                  'Quiz Station', Icons.quiz, Colors.orange),
+              _buildInteractiveObject(
+                  'Experiment Lab', Icons.science, Colors.teal),
+              _buildInteractiveObject(
+                  'Discussion Area', Icons.forum, Colors.pink),
+            ],
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildInteractiveObject(String name, IconData icon, Color color) {
+    return Container(
+      width: 120,
+      padding: const EdgeInsets.all(AppTheme.spacing3),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            Symbols.quiz,
-            color: AppTheme.primaryColor,
-            size: 32,
-          ),
+          Icon(icon, color: color, size: 32),
           const SizedBox(height: AppTheme.spacing2),
           Text(
-            'Interactive Quiz',
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: AppTheme.spacing2),
-          Text(
-            'Answer questions by interacting with 3D objects',
-            style: Theme.of(context).textTheme.bodySmall,
+            name,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: color,
+                  fontWeight: FontWeight.bold,
+                ),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: AppTheme.spacing3),
-          ElevatedButton(
-            onPressed: () => _startInteractiveQuiz(),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 36),
-            ),
-            child: const Text('Start Quiz'),
-          ),
         ],
       ),
-    ).animate().fadeIn(delay: 800.ms).scale(begin: const Offset(0.8, 0.8));
-  }
-
-  Widget _buildSpatialUI(BuildContext context) {
-    return Stack(
-      children: [
-        // Floating menu panels
-        Positioned(
-          top: 150,
-          left: 20,
-          child: _buildFloatingPanel(
-            'Tools',
-            [
-              _buildToolButton(Symbols.brush, 'Draw', () {}),
-              _buildToolButton(Symbols.text_fields, 'Text', () {}),
-              _buildToolButton(Symbols.shapes, 'Shapes', () {}),
-              _buildToolButton(Symbols.delete, 'Erase', () {}),
-            ],
-          ),
-        ),
-        
-        // Environment controls
-        Positioned(
-          bottom: 200,
-          left: 20,
-          child: _buildFloatingPanel(
-            'Environment',
-            [
-              _buildToolButton(Symbols.wb_sunny, 'Lighting', () {}),
-              _buildToolButton(Symbols.palette, 'Theme', () {}),
-              _buildToolButton(Symbols.view_in_ar, 'Objects', () {}),
-              _buildToolButton(Symbols.settings, 'Settings', () {}),
-            ],
-          ),
-        ),
-      ],
     );
   }
 
-  Widget _buildFloatingPanel(String title, List<Widget> tools) {
+  Widget _buildVRSettings() {
     return Container(
-      padding: const EdgeInsets.all(AppTheme.spacing3),
-      decoration: AppTheme.glassmorphismDecoration,
+      padding: const EdgeInsets.all(AppTheme.spacing5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXxl),
+        boxShadow: AppTheme.cardShadow,
+      ),
       child: Column(
-        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
+            'VR Settings',
+            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  fontWeight: FontWeight.bold,
+                ),
           ),
-          const SizedBox(height: AppTheme.spacing2),
-          ...tools,
-        ],
-      ),
-    ).animate().fadeIn(delay: 600.ms).slideX(begin: -0.2);
-  }
+          const SizedBox(height: AppTheme.spacing4),
 
-  Widget _buildToolButton(IconData icon, String tooltip, VoidCallback onPressed) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing1),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white),
-        onPressed: onPressed,
-        tooltip: tooltip,
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
+          // Settings Options
+          _buildSettingOption(
+            'Movement Speed',
+            'Normal',
+            Icons.speed,
+            onTap: () {},
           ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildUIOverlay(BuildContext context, VRClassroomState vrState) {
-    return Positioned.fill(
-      child: SafeArea(
-        child: Column(
-          children: [
-            // Top bar
-            _buildTopBar(context, vrState),
-            
-            const Spacer(),
-            
-            // Bottom controls
-            _buildBottomControls(context, vrState),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildTopBar(BuildContext context, VRClassroomState vrState) {
-    return Container(
-      margin: const EdgeInsets.all(AppTheme.spacing4),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppTheme.spacing4,
-        vertical: AppTheme.spacing3,
-      ),
-      decoration: AppTheme.glassmorphismDecoration,
-      child: Row(
-        children: [
-          // Back button
-          IconButton(
-            icon: const Icon(Symbols.arrow_back, color: Colors.white),
-            onPressed: () => Navigator.pop(context),
+          _buildSettingOption(
+            'Audio Quality',
+            'High',
+            Icons.audio_file,
+            onTap: () {},
           ),
-          
-          const SizedBox(width: AppTheme.spacing2),
-          
-          // Room info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  vrState.roomName ?? 'VR Classroom',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '${vrState.participants.length} participants',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
+          _buildSettingOption(
+            'Graphics Quality',
+            'Ultra',
+            Icons.high_quality,
+            onTap: () {},
           ),
-          
-          // Connection status
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppTheme.spacing3,
-              vertical: AppTheme.spacing1,
-            ),
-            decoration: BoxDecoration(
-              color: vrState.isConnected 
-                  ? AppTheme.successColor.withOpacity(0.2)
-                  : AppTheme.errorColor.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-              border: Border.all(
-                color: vrState.isConnected 
-                    ? AppTheme.successColor
-                    : AppTheme.errorColor,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: BoxDecoration(
-                    color: vrState.isConnected 
-                        ? AppTheme.successColor
-                        : AppTheme.errorColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-                const SizedBox(width: AppTheme.spacing2),
-                Text(
-                  vrState.isConnected ? 'Connected' : 'Connecting...',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Settings menu
-          IconButton(
-            icon: const Icon(Symbols.settings, color: Colors.white),
-            onPressed: () => _showVRSettings(context),
+          _buildSettingOption(
+            'Comfort Mode',
+            'Enabled',
+            Icons.accessibility,
+            onTap: () {},
           ),
         ],
       ),
-    ).animate().slideY(begin: -1.0, delay: 300.ms);
-  }
-
-  Widget _buildBottomControls(BuildContext context, VRClassroomState vrState) {
-    return Container(
-      margin: const EdgeInsets.all(AppTheme.spacing4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // Microphone control
-          _buildControlButton(
-            icon: vrState.isMicrophoneOn ? Symbols.mic : Symbols.mic_off,
-            label: 'Mic',
-            isActive: vrState.isMicrophoneOn,
-            onPressed: () => ref.read(vrClassroomProvider.notifier).toggleMicrophone(),
-          ),
-          
-          // Camera control
-          _buildControlButton(
-            icon: vrState.isCameraOn ? Symbols.videocam : Symbols.videocam_off,
-            label: 'Camera',
-            isActive: vrState.isCameraOn,
-            onPressed: () => ref.read(vrClassroomProvider.notifier).toggleCamera(),
-          ),
-          
-          // Hand tracking
-          _buildControlButton(
-            icon: Symbols.back_hand,
-            label: 'Hands',
-            isActive: _isHandTrackingEnabled,
-            onPressed: () => setState(() => _isHandTrackingEnabled = !_isHandTrackingEnabled),
-          ),
-          
-          // Spatial audio
-          _buildControlButton(
-            icon: _isSpatialAudioEnabled ? Symbols.spatial_audio : Symbols.volume_off,
-            label: 'Audio',
-            isActive: _isSpatialAudioEnabled,
-            onPressed: () => setState(() => _isSpatialAudioEnabled = !_isSpatialAudioEnabled),
-          ),
-          
-          // Immersive mode toggle
-          _buildControlButton(
-            icon: _isImmersiveMode ? Symbols.fullscreen_exit : Symbols.fullscreen,
-            label: 'Immersive',
-            isActive: _isImmersiveMode,
-            onPressed: _toggleImmersiveMode,
-          ),
-        ],
-      ),
-    ).animate().slideY(begin: 1.0, delay: 400.ms);
-  }
-
-  Widget _buildControlButton({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onPressed,
-  }) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: isActive 
-                ? AppTheme.primaryColor.withOpacity(0.9)
-                : Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-            border: Border.all(
-              color: isActive 
-                  ? AppTheme.primaryColor
-                  : Colors.white.withOpacity(0.3),
-              width: 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isActive ? AppTheme.primaryColor : Colors.white)
-                    .withOpacity(0.3),
-                blurRadius: 10,
-                spreadRadius: 1,
-              ),
-            ],
-          ),
-          child: IconButton(
-            icon: Icon(
-              icon,
-              color: Colors.white,
-              size: 24,
-            ),
-            onPressed: onPressed,
-          ),
-        ),
-        const SizedBox(height: AppTheme.spacing2),
-        Text(
-          label,
-          style: Theme.of(context).textTheme.labelSmall?.copyWith(
-            color: Colors.white.withOpacity(0.9),
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-      ],
     );
   }
 
-  Widget _buildImmersiveControls(BuildContext context) {
-    return Positioned(
-      right: 20,
-      top: MediaQuery.of(context).size.height / 2 - 100,
-      child: ImmersiveControls(
-        isVisible: _isImmersiveMode,
-        onToggleUI: _toggleImmersiveMode,
-        onAdjustComfort: (level) => setState(() => _comfortLevel = level),
-        onEmergencyExit: () => Navigator.pop(context),
+  Widget _buildSettingOption(String title, String value, IconData icon,
+      {VoidCallback? onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: AppTheme.primaryColor),
+      title: Text(title),
+      subtitle: Text(value),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: onTap,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
       ),
     );
-  }
-
-  Widget _buildHandTrackingOverlay(BuildContext context) {
-    if (!_isHandTrackingEnabled) return const SizedBox.shrink();
-    
-    return Positioned.fill(
-      child: VRHandTracking(
-        onGestureDetected: (gesture) {
-          ref.read(vrClassroomProvider.notifier).handleGesture(gesture);
-        },
-        onHandPositionChanged: (leftHand, rightHand) {
-          ref.read(vrClassroomProvider.notifier).updateHandPositions(leftHand, rightHand);
-        },
-      ),
-    );
-  }
-
-  Widget _buildLoadingOverlay(BuildContext context) {
-    return Container(
-      color: Colors.black.withOpacity(0.8),
-      child: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(
-              valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            Text(
-              'Initializing VR Environment...',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing2),
-            Text(
-              'Please ensure your VR headset is connected',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.white.withOpacity(0.8),
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _toggleImmersiveMode() {
-    setState(() {
-      _isImmersiveMode = !_isImmersiveMode;
-    });
-    
-    if (_isImmersiveMode) {
-      _immersionController.forward();
-    } else {
-      _immersionController.reverse();
-    }
-  }
-
-  void _showVRSettings(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(AppTheme.radiusLarge),
-          ),
-        ),
-        child: Column(
-          children: [
-            // Handle
-            Container(
-              width: 40,
-              height: 4,
-              margin: const EdgeInsets.symmetric(vertical: AppTheme.spacing2),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade300,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            
-            // Header
-            Padding(
-              padding: const EdgeInsets.all(AppTheme.spacing4),
-              child: Row(
-                children: [
-                  Text(
-                    'VR Settings',
-                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Symbols.close),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-            
-            // Settings content
-            Expanded(
-              child: ListView(
-                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacing4),
-                children: [
-                  // Environment selector
-                  VREnvironmentSelector(
-                    selectedEnvironment: _selectedEnvironment,
-                    onEnvironmentChanged: (environment) {
-                      setState(() => _selectedEnvironment = environment);
-                    },
-                  ),
-                  
-                  const SizedBox(height: AppTheme.spacing6),
-                  
-                  // Comfort settings
-                  _buildComfortSettings(),
-                  
-                  const SizedBox(height: AppTheme.spacing6),
-                  
-                  // Audio settings
-                  SpatialAudioControls(
-                    isEnabled: _isSpatialAudioEnabled,
-                    onToggle: (enabled) => setState(() => _isSpatialAudioEnabled = enabled),
-                  ),
-                  
-                  const SizedBox(height: AppTheme.spacing6),
-                  
-                  // Accessibility settings
-                  _buildAccessibilitySettings(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildComfortSettings() {
-    return AdaptiveCard(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacing4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Comfort Settings',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            
-            // Comfort level slider
-            Text(
-              'Comfort Level: ${(_comfortLevel * 100).round()}%',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            Slider(
-              value: _comfortLevel,
-              onChanged: (value) => setState(() => _comfortLevel = value),
-              divisions: 10,
-              label: '${(_comfortLevel * 100).round()}%',
-            ),
-            
-            const SizedBox(height: AppTheme.spacing3),
-            
-            // Motion sickness reduction
-            SwitchListTile(
-              title: const Text('Motion Sickness Reduction'),
-              subtitle: const Text('Reduces camera movement and effects'),
-              value: _comfortLevel < 0.5,
-              onChanged: (value) {
-                setState(() {
-                  _comfortLevel = value ? 0.3 : 0.8;
-                });
-              },
-            ),
-            
-            // Haptic feedback
-            SwitchListTile(
-              title: const Text('Haptic Feedback'),
-              subtitle: const Text('Feel interactions through controller vibration'),
-              value: _isHapticsEnabled,
-              onChanged: (value) => setState(() => _isHapticsEnabled = value),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAccessibilitySettings() {
-    return AdaptiveCard(
-      child: Padding(
-        padding: const EdgeInsets.all(AppTheme.spacing4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Accessibility',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: AppTheme.spacing4),
-            
-            SwitchListTile(
-              title: const Text('Voice Commands'),
-              subtitle: const Text('Control VR with voice'),
-              value: true,
-              onChanged: (value) {},
-            ),
-            
-            SwitchListTile(
-              title: const Text('High Contrast Mode'),
-              subtitle: const Text('Improve visibility for low vision'),
-              value: false,
-              onChanged: (value) {},
-            ),
-            
-            SwitchListTile(
-              title: const Text('Subtitle Display'),
-              subtitle: const Text('Show captions for all audio'),
-              value: true,
-              onChanged: (value) {},
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolButton(IconData icon, String tooltip, VoidCallback onPressed) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppTheme.spacing1),
-      child: IconButton(
-        icon: Icon(icon, color: Colors.white),
-        onPressed: onPressed,
-        tooltip: tooltip,
-        style: IconButton.styleFrom(
-          backgroundColor: Colors.white.withOpacity(0.1),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
-          ),
-        ),
-      ),
-    );
-  }
-
-  void _startInteractiveQuiz() {
-    // Start interactive VR quiz
-    ref.read(vrClassroomProvider.notifier).startInteractiveQuiz();
-  }
-
-  String _getEnvironmentImage(String environment) {
-    switch (environment) {
-      case 'modern_classroom':
-        return 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg';
-      case 'science_lab':
-        return 'https://images.pexels.com/photos/2280549/pexels-photo-2280549.jpeg';
-      case 'space_station':
-        return 'https://images.pexels.com/photos/586063/pexels-photo-586063.jpeg';
-      default:
-        return 'https://images.pexels.com/photos/5212345/pexels-photo-5212345.jpeg';
-    }
   }
 }
 
-// Custom painter for VR grid
+// VR Grid Background Painter
 class VRGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
       ..color = Colors.white.withOpacity(0.1)
       ..strokeWidth = 1;
-    
-    const gridSize = 50.0;
-    
+
+    const gridSize = 20.0;
+
     // Draw vertical lines
-    for (double x = 0; x < size.width; x += gridSize) {
+    for (double x = 0; x <= size.width; x += gridSize) {
       canvas.drawLine(
         Offset(x, 0),
         Offset(x, size.height),
         paint,
       );
     }
-    
+
     // Draw horizontal lines
-    for (double y = 0; y < size.height; y += gridSize) {
+    for (double y = 0; y <= size.height; y += gridSize) {
       canvas.drawLine(
         Offset(0, y),
         Offset(size.width, y),
@@ -928,18 +705,15 @@ class VRGridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  bool shouldRepaint(CustomPainter oldDelegate) => false;
 }
 
-// Helper function for cosine calculation
-double cos(double radians) {
-  return math.cos(radians);
+// Feature Colors for different VR features
+class FeatureColors {
+  static const Color vrClassroom = Color(0xFF6366F1);
+  static const Color arExperience = Color(0xFF10B981);
+  static const Color liveClass = Color(0xFFF59E0B);
+  static const Color aiTutor = Color(0xFF8B5CF6);
+  static const Color socialLearning = Color(0xFFEC4899);
+  static const Color analytics = Color(0xFF06B6D4);
 }
-
-// Helper function for sine calculation  
-double sin(double radians) {
-  return math.sin(radians);
-}
-
-// Import math library
-import 'dart:math' as math;
