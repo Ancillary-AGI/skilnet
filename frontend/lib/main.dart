@@ -5,6 +5,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'core/app_config.dart';
 import 'core/router/app_router.dart';
 import 'core/services/api_service.dart';
+import 'core/services/auth_service.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
@@ -43,6 +44,9 @@ void main() async {
 
   // Initialize API service
   await ApiService.instance.initialize();
+  
+  // Initialize Auth service
+  await AuthService.instance.initialize();
 
   runApp(
     const ProviderScope(

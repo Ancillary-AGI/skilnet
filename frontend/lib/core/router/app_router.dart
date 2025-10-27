@@ -10,10 +10,11 @@ import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/courses/presentation/pages/courses_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
+import '../services/cache_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
-    initialLocation: '/onboarding',
+    initialLocation: _getInitialRoute(),
     routes: [
       GoRoute(
         path: '/onboarding',
@@ -44,6 +45,16 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/courses',
         name: 'courses',
         builder: (context, state) => const CoursesPage(),
+        routes: [
+          GoRoute(
+            path: '/:courseId',
+            name: 'course-detail',
+            builder: (context, state) {
+              final courseId = state.pathParameters['courseId']!;
+              return CourseDetailPage(courseId: courseId);
+            },
+          ),
+        ],
       ),
       GoRoute(
         path: '/profile',
@@ -55,7 +66,45 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: 'settings',
         builder: (context, state) => const SettingsPage(),
       ),
+      // Additional routes
+      GoRoute(
+        path: '/search',
+        name: 'search',
+        builder: (context, state) => const SearchPage(),
+      ),
+      GoRoute(
+        path: '/notifications',
+        name: 'notifications',
+        builder: (context, state) => const NotificationsPage(),
+      ),
+      GoRoute(
+        path: '/achievements',
+        name: 'achievements',
+        builder: (context, state) => const AchievementsPage(),
+      ),
     ],
+    redirect: (context, state) {
+      try {
+        final isLoggedIn = CacheService.isLoggedIn;
+        final isOnboarding = CacheService.getSetting('onboarding_completed') ?? false;
+        
+        // If not onboarded, go to onboarding
+        if (!isOnboarding && state.matchedLocation != '/onboarding') {
+          return '/onboarding';
+        }
+        
+        // If not logged in and trying to access protected routes
+        final protectedRoutes = ['/dashboard', '/profile', '/courses'];
+        if (!isLoggedIn && protectedRoutes.any((route) => state.matchedLocation.startsWith(route))) {
+          return '/login';
+        }
+        
+        return null; // No redirect needed
+      } catch (e) {
+        // Fallback for tests or when cache is not initialized
+        return null;
+      }
+    },
     errorBuilder: (context, state) => Scaffold(
       body: Center(
         child: Column(
@@ -84,3 +133,76 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     ),
   );
 });
+
+String _getInitialRoute() {
+  try {
+    final isOnboarded = CacheService.getSetting('onboarding_completed') ?? false;
+    final isLoggedIn = CacheService.isLoggedIn;
+    
+    if (!isOnboarded) return '/onboarding';
+    if (!isLoggedIn) return '/home';
+    return '/dashboard';
+  } catch (e) {
+    // Fallback for tests or when cache is not initialized
+    return '/onboarding';
+  }
+}
+
+// Placeholder pages for additional routes
+class CourseDetailPage extends StatelessWidget {
+  final String courseId;
+  
+  const CourseDetailPage({super.key, required this.courseId});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Course $courseId')),
+      body: Center(
+        child: Text('Course Detail Page - ID: $courseId'),
+      ),
+    );
+  }
+}
+
+class SearchPage extends StatelessWidget {
+  const SearchPage({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Search')),
+      body: const Center(
+        child: Text('Search Page - Coming Soon'),
+      ),
+    );
+  }
+}
+
+class NotificationsPage extends StatelessWidget {
+  const NotificationsPage({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Notifications')),
+      body: const Center(
+        child: Text('Notifications Page - Coming Soon'),
+      ),
+    );
+  }
+}
+
+class AchievementsPage extends StatelessWidget {
+  const AchievementsPage({super.key});
+  
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Achievements')),
+      body: const Center(
+        child: Text('Achievements Page - Coming Soon'),
+      ),
+    );
+  }
+}

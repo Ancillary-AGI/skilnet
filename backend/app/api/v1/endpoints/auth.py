@@ -340,3 +340,17 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Authentication failed: {str(e)}"
         )
+
+# Optional dependency for endpoints that work with or without authentication
+async def get_current_user_optional(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> Optional[User]:
+    """Optional dependency to get current authenticated user"""
+    if not credentials:
+        return None
+    
+    try:
+        return await get_current_user(credentials, db)
+    except HTTPException:
+        return None

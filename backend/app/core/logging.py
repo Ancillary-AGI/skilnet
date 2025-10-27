@@ -1,328 +1,257 @@
 """
-Advanced logging configuration for EduVerse platform
+Logging configuration for EduVerse platform
 """
 
 import logging
 import logging.config
-import json
 import sys
-from datetime import datetime
-from typing import Dict, Any, Optional
 from pathlib import Path
-import os
-# from pythonjsonlogger import jsonlogger  # Optional dependency
-
-from app.core.config import settings
-
-
-class EduVerseFormatter(logging.Formatter):
-    """Custom formatter for EduVerse logs"""
-
-    def format(self, record: logging.LogRecord) -> str:
-        # Add timestamp if not present
-        if not hasattr(record, 'timestamp'):
-            record.timestamp = datetime.utcnow().isoformat()
-
-        # Add request ID if available
-        if not hasattr(record, 'request_id'):
-            record.request_id = 'N/A'
-
-        # Add user ID if available
-        if not hasattr(record, 'user_id'):
-            record.user_id = 'N/A'
-
-        # Add service name
-        record.service = 'eduverse-api'
-
-        # Add environment
-        record.environment = os.getenv('ENVIRONMENT', 'development')
-
-        return super().format(record)
+from typing import Dict, Any
+import json
+from datetime import datetime
 
 
 class JSONFormatter(logging.Formatter):
-    """JSON formatter for structured logging"""
-
+    """Custom JSON formatter for structured logging"""
+    
     def format(self, record: logging.LogRecord) -> str:
-        # Create JSON log record
-        log_record = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'service': 'eduverse-api',
-            'environment': os.getenv('ENVIRONMENT', 'development'),
-            'version': getattr(settings, 'VERSION', '1.0.0'),
-            'level': record.levelname,
-            'logger': record.name,
-            'message': record.getMessage(),
+        log_entry = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+            "module": record.module,
+            "function": record.funcName,
+            "line": record.lineno,
         }
-
-        # Add request context if available
-        if hasattr(record, 'request_id'):
-            log_record['request_id'] = record.request_id
-        if hasattr(record, 'user_id'):
-            log_record['user_id'] = record.user_id
-        if hasattr(record, 'user_agent'):
-            log_record['user_agent'] = record.user_agent
-        if hasattr(record, 'ip_address'):
-            log_record['ip_address'] = record.ip_address
-
+        
         # Add exception info if present
         if record.exc_info:
-            log_record['exception'] = self.formatException(record.exc_info)
-
-        return json.dumps(log_record)
+            log_entry["exception"] = self.formatException(record.exc_info)
+        
+        # Add extra fields
+        if hasattr(record, 'user_id'):
+            log_entry["user_id"] = record.user_id
+        if hasattr(record, 'request_id'):
+            log_entry["request_id"] = record.request_id
+        if hasattr(record, 'ip_address'):
+            log_entry["ip_address"] = record.ip_address
+            
+        return json.dumps(log_entry)
 
 
 def setup_logging(
     log_level: str = "INFO",
-    log_format: str = "json",
-    log_file: Optional[str] = None,
-    enable_console: bool = True
+    log_file: str = "logs/eduverse.log",
+    enable_json: bool = False
 ) -> None:
-    """Setup comprehensive logging configuration"""
-
+    """Setup logging configuration"""
+    
     # Create logs directory if it doesn't exist
-    if log_file:
-        log_dir = Path(log_file).parent
-        log_dir.mkdir(parents=True, exist_ok=True)
-
-    # Configure log levels
-    numeric_level = getattr(logging, log_level.upper(), logging.INFO)
-
-    # Base configuration
-    config = {
-        'version': 1,
-        'disable_existing_loggers': False,
-        'formatters': {},
-        'handlers': {},
-        'loggers': {
-            'eduverse': {
-                'level': log_level,
-                'handlers': [],
-                'propagate': False,
-            },
-            'uvicorn': {
-                'level': log_level,
-                'handlers': [],
-                'propagate': False,
-            },
-            'sqlalchemy': {
-                'level': 'WARNING',  # Reduce SQLAlchemy noise
-                'handlers': [],
-                'propagate': False,
-            },
+    log_path = Path(log_file)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    
+    # Define formatters
+    formatters = {
+        "default": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
         },
-        'root': {
-            'level': numeric_level,
-            'handlers': [],
+        "detailed": {
+            "format": "%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S"
+        },
+        "json": {
+            "()": JSONFormatter
         }
     }
-
-    # Console handler
-    if enable_console:
-        if log_format == 'json':
-            config['formatters']['json'] = {
-                '()': JSONFormatter,
-                'format': '%(timestamp)s %(name)s %(levelname)s %(message)s',
-            }
-            console_formatter = 'json'
-        else:
-            config['formatters']['console'] = {
-                '()': EduVerseFormatter,
-                'format': '%(timestamp)s - %(name)s - %(levelname)s - %(request_id)s - %(user_id)s - %(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
-            }
-            console_formatter = 'console'
-
-        config['handlers']['console'] = {
-            'class': 'logging.StreamHandler',
-            'formatter': console_formatter,
-            'stream': sys.stdout,
-            'level': numeric_level,
+    
+    # Define handlers
+    handlers = {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": log_level,
+            "formatter": "json" if enable_json else "default",
+            "stream": sys.stdout
+        },
+        "file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": log_level,
+            "formatter": "json" if enable_json else "detailed",
+            "filename": log_file,
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "encoding": "utf8"
+        },
+        "error_file": {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "ERROR",
+            "formatter": "json" if enable_json else "detailed",
+            "filename": "logs/eduverse_errors.log",
+            "maxBytes": 10485760,  # 10MB
+            "backupCount": 5,
+            "encoding": "utf8"
         }
-
-        # Add console handler to all loggers
-        for logger_name in config['loggers']:
-            config['loggers'][logger_name]['handlers'].append('console')
-        config['root']['handlers'].append('console')
-
-    # File handler
-    if log_file:
-        if log_format == 'json':
-            file_formatter = 'json'
-        else:
-            config['formatters']['file'] = {
-                '()': EduVerseFormatter,
-                'format': '%(asctime)s - %(name)s - %(levelname)s - %(request_id)s - %(user_id)s - %(message)s',
-                'datefmt': '%Y-%m-%d %H:%M:%S',
-            }
-            file_formatter = 'file'
-
-        config['handlers']['file'] = {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'formatter': file_formatter,
-            'filename': log_file,
-            'maxBytes': 10 * 1024 * 1024,  # 10MB
-            'backupCount': 5,
-            'level': numeric_level,
+    }
+    
+    # Define loggers
+    loggers = {
+        "": {  # Root logger
+            "level": log_level,
+            "handlers": ["console", "file", "error_file"]
+        },
+        "uvicorn": {
+            "level": "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False
+        },
+        "uvicorn.error": {
+            "level": "INFO",
+            "handlers": ["console", "file"],
+            "propagate": False
+        },
+        "uvicorn.access": {
+            "level": "INFO",
+            "handlers": ["file"],
+            "propagate": False
+        },
+        "sqlalchemy.engine": {
+            "level": "WARNING",
+            "handlers": ["file"],
+            "propagate": False
+        },
+        "app": {
+            "level": log_level,
+            "handlers": ["console", "file", "error_file"],
+            "propagate": False
         }
-
-        # Add file handler to all loggers
-        for logger_name in config['loggers']:
-            config['loggers'][logger_name]['handlers'].append('file')
-        config['root']['handlers'].append('file')
-
-    # Apply configuration
-    logging.config.dictConfig(config)
-
-    # Set up additional loggers
-    setup_additional_loggers()
-
-
-def setup_additional_loggers():
-    """Setup additional specialized loggers"""
-
-    # Security logger
-    security_logger = logging.getLogger('eduverse.security')
-    security_logger.setLevel(logging.INFO)
-
-    # Performance logger
-    performance_logger = logging.getLogger('eduverse.performance')
-    performance_logger.setLevel(logging.INFO)
-
-    # Audit logger
-    audit_logger = logging.getLogger('eduverse.audit')
-    audit_logger.setLevel(logging.INFO)
-
-    # Error logger
-    error_logger = logging.getLogger('eduverse.error')
-    error_logger.setLevel(logging.ERROR)
+    }
+    
+    # Configure logging
+    logging_config = {
+        "version": 1,
+        "disable_existing_loggers": False,
+        "formatters": formatters,
+        "handlers": handlers,
+        "loggers": loggers
+    }
+    
+    logging.config.dictConfig(logging_config)
+    
+    # Set up custom logger for the app
+    logger = logging.getLogger("app")
+    logger.info("Logging system initialized")
 
 
 def get_logger(name: str) -> logging.Logger:
-    """Get a configured logger instance"""
-    return logging.getLogger(f'eduverse.{name}')
+    """Get a logger instance"""
+    return logging.getLogger(f"app.{name}")
 
 
-def log_request_middleware(request, call_next):
-    """Middleware for logging HTTP requests"""
-    import time
-    import uuid
+class LoggerMixin:
+    """Mixin class to add logging capabilities to any class"""
+    
+    @property
+    def logger(self) -> logging.Logger:
+        return get_logger(self.__class__.__name__)
 
-    start_time = time.time()
-    request_id = str(uuid.uuid4())
 
-    # Add request ID to logger context
-    logger = logging.getLogger('eduverse.request')
-    logger = logging.LoggerAdapter(logger, {'request_id': request_id})
-
-    # Log request
-    logger.info(
-        "Request started",
-        extra={
-            'method': request.method,
-            'url': str(request.url),
-            'user_agent': request.headers.get('user-agent', 'N/A'),
-            'ip_address': request.client.host if request.client else 'N/A',
-        }
-    )
-
-    try:
-        response = call_next(request)
-        process_time = time.time() - start_time
-
-        # Log response
-        logger.info(
-            "Request completed",
+# Context manager for request logging
+class RequestLogger:
+    """Context manager for request-specific logging"""
+    
+    def __init__(self, request_id: str, user_id: str = None, ip_address: str = None):
+        self.request_id = request_id
+        self.user_id = user_id
+        self.ip_address = ip_address
+        self.logger = get_logger("request")
+        
+    def __enter__(self):
+        self.logger.info(
+            f"Request started: {self.request_id}",
             extra={
-                'status_code': response.status_code,
-                'process_time': f"{process_time:.3f}s",
+                "request_id": self.request_id,
+                "user_id": self.user_id,
+                "ip_address": self.ip_address
             }
         )
-
-        return response
-
-    except Exception as e:
-        process_time = time.time() - start_time
-        logger.error(
-            "Request failed",
-            extra={
-                'error': str(e),
-                'process_time': f"{process_time:.3f}s",
-            },
-            exc_info=True
-        )
-        raise
-
-
-def log_performance(operation: str, duration: float, **kwargs):
-    """Log performance metrics"""
-    logger = logging.getLogger('eduverse.performance')
-    logger.info(
-        f"Performance: {operation}",
-        extra={
-            'operation': operation,
-            'duration': duration,
-            'duration_unit': 'seconds',
-            **kwargs
-        }
-    )
+        return self
+        
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        if exc_type:
+            self.logger.error(
+                f"Request failed: {self.request_id} - {exc_val}",
+                extra={
+                    "request_id": self.request_id,
+                    "user_id": self.user_id,
+                    "ip_address": self.ip_address
+                },
+                exc_info=True
+            )
+        else:
+            self.logger.info(
+                f"Request completed: {self.request_id}",
+                extra={
+                    "request_id": self.request_id,
+                    "user_id": self.user_id,
+                    "ip_address": self.ip_address
+                }
+            )
 
 
-def log_security_event(event: str, user_id: Optional[str] = None, **kwargs):
-    """Log security-related events"""
-    logger = logging.getLogger('eduverse.security')
-    logger.warning(
-        f"Security: {event}",
-        extra={
-            'event': event,
-            'user_id': user_id or 'N/A',
-            **kwargs
-        }
-    )
-
-
-def log_audit_event(event: str, user_id: str, resource: str, action: str, **kwargs):
-    """Log audit events for compliance"""
-    logger = logging.getLogger('eduverse.audit')
-    logger.info(
-        f"Audit: {event}",
-        extra={
-            'event': event,
-            'user_id': user_id,
-            'resource': resource,
-            'action': action,
-            'timestamp': datetime.utcnow().isoformat(),
-            **kwargs
-        }
-    )
-
-
-def log_error(error: Exception, user_id: Optional[str] = None, **kwargs):
-    """Log application errors"""
-    logger = logging.getLogger('eduverse.error')
-    logger.error(
-        f"Error: {str(error)}",
-        extra={
-            'error_type': type(error).__name__,
-            'error_message': str(error),
-            'user_id': user_id or 'N/A',
-            **kwargs
-        },
-        exc_info=True
-    )
-
-
-# Initialize logging on import
-if settings.DEBUG:
-    setup_logging(
-        log_level="DEBUG",
-        log_format="console",
-        enable_console=True
-    )
-else:
-    setup_logging(
-        log_level="INFO",
-        log_format="json",
-        log_file="./logs/eduverse.log",
-        enable_console=True
-    )
+# Performance logging decorator
+def log_performance(func):
+    """Decorator to log function performance"""
+    import functools
+    import time
+    
+    @functools.wraps(func)
+    async def async_wrapper(*args, **kwargs):
+        logger = get_logger("performance")
+        start_time = time.time()
+        
+        try:
+            result = await func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            logger.info(
+                f"{func.__name__} completed in {execution_time:.3f}s",
+                extra={"execution_time": execution_time, "function": func.__name__}
+            )
+            return result
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(
+                f"{func.__name__} failed after {execution_time:.3f}s: {e}",
+                extra={"execution_time": execution_time, "function": func.__name__},
+                exc_info=True
+            )
+            raise
+    
+    @functools.wraps(func)
+    def sync_wrapper(*args, **kwargs):
+        logger = get_logger("performance")
+        start_time = time.time()
+        
+        try:
+            result = func(*args, **kwargs)
+            execution_time = time.time() - start_time
+            logger.info(
+                f"{func.__name__} completed in {execution_time:.3f}s",
+                extra={"execution_time": execution_time, "function": func.__name__}
+            )
+            return result
+        except Exception as e:
+            execution_time = time.time() - start_time
+            logger.error(
+                f"{func.__name__} failed after {execution_time:.3f}s: {e}",
+                extra={"execution_time": execution_time, "function": func.__name__},
+                exc_info=True
+            )
+            raise
+    
+    # Return appropriate wrapper based on function type
+    import asyncio
+    if asyncio.iscoroutinefunction(func):
+        return async_wrapper
+    else:
+        return sync_wrapper

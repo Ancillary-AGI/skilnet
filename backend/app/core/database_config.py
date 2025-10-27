@@ -5,7 +5,10 @@ Database configuration with support for multiple database backends
 import os
 from enum import Enum
 from typing import Optional, Dict, Any
-from pydantic import BaseSettings
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -91,11 +94,20 @@ class DatabaseConfig(BaseSettings):
         
         # Convert to async drivers
         if self.DB_TYPE == DatabaseType.POSTGRESQL:
-            return url.replace("postgresql://", "postgresql+asyncpg://")
+            if "postgresql://" in url:
+                return url.replace("postgresql://", "postgresql+asyncpg://")
+            elif "postgresql+asyncpg://" not in url:
+                return f"postgresql+asyncpg://{url}"
         elif self.DB_TYPE == DatabaseType.MYSQL:
-            return url.replace("mysql://", "mysql+aiomysql://")
+            if "mysql://" in url:
+                return url.replace("mysql://", "mysql+aiomysql://")
+            elif "mysql+aiomysql://" not in url:
+                return f"mysql+aiomysql://{url}"
         elif self.DB_TYPE == DatabaseType.SQLITE:
-            return url.replace("sqlite://", "sqlite+aiosqlite://")
+            if "sqlite://" in url:
+                return url.replace("sqlite://", "sqlite+aiosqlite://")
+            elif "sqlite+aiosqlite://" not in url:
+                return f"sqlite+aiosqlite:///{url}"
         
         return url
     
@@ -128,12 +140,7 @@ class DatabaseConfig(BaseSettings):
     
     def get_engine_kwargs(self) -> Dict[str, Any]:
         """Get engine-specific kwargs"""
-        kwargs = {
-            "pool_size": self.DB_POOL_SIZE,
-            "max_overflow": self.DB_MAX_OVERFLOW,
-            "pool_timeout": self.DB_POOL_TIMEOUT,
-            "pool_recycle": self.DB_POOL_RECYCLE,
-        }
+        kwargs = {}
         
         # SQLite specific settings
         if self.DB_TYPE == DatabaseType.SQLITE:
@@ -141,10 +148,18 @@ class DatabaseConfig(BaseSettings):
                 "poolclass": StaticPool,
                 "connect_args": {"check_same_thread": False}
             })
+        else:
+            # Pool settings for other databases
+            kwargs.update({
+                "pool_size": self.DB_POOL_SIZE,
+                "max_overflow": self.DB_MAX_OVERFLOW,
+                "pool_timeout": self.DB_POOL_TIMEOUT,
+                "pool_recycle": self.DB_POOL_RECYCLE,
+            })
         
         # SSL settings for cloud databases
         if self.DB_TYPE in [DatabaseType.POSTGRESQL, DatabaseType.MYSQL]:
-            connect_args = {}
+            connect_args = kwargs.get("connect_args", {})
             
             if self.DB_SSL_MODE != "disable":
                 connect_args["sslmode"] = self.DB_SSL_MODE

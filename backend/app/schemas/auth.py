@@ -2,10 +2,11 @@
 Authentication schemas for EduVerse platform
 """
 
-from pydantic import BaseModel, EmailStr, validator, Field
-from typing import Optional, Dict, Any
+from pydantic import BaseModel, EmailStr, Field, validator
+from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
+
 
 class SocialProvider(str, Enum):
     GOOGLE = "google"
@@ -13,17 +14,23 @@ class SocialProvider(str, Enum):
     FACEBOOK = "facebook"
     MICROSOFT = "microsoft"
 
+
 class UserRegister(BaseModel):
-    email: EmailStr
-    password: str = Field(..., min_length=8, max_length=100)
-    full_name: Optional[str] = Field(None, max_length=100)
-    username: Optional[str] = Field(None, min_length=3, max_length=30)
-    country_code: Optional[str] = Field(None, max_length=2)
-    language_preference: str = Field("en", max_length=5)
-    timezone: Optional[str] = None
+    """User registration schema"""
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., min_length=8, description="User password (min 8 characters)")
+    full_name: str = Field(..., min_length=2, max_length=100, description="User full name")
+    username: Optional[str] = Field(None, min_length=3, max_length=30, description="Username (optional)")
+    country_code: Optional[str] = Field(None, min_length=2, max_length=2, description="ISO country code")
+    language_preference: str = Field("en", description="Preferred language")
+    timezone: Optional[str] = Field(None, description="User timezone")
+    date_of_birth: Optional[datetime] = Field(None, description="Date of birth")
+    marketing_consent: bool = Field(False, description="Marketing emails consent")
+    terms_accepted: bool = Field(..., description="Terms and conditions acceptance")
     
     @validator('password')
     def validate_password(cls, v):
+        """Validate password strength"""
         if len(v) < 8:
             raise ValueError('Password must be at least 8 characters long')
         if not any(c.isupper() for c in v):
@@ -36,141 +43,205 @@ class UserRegister(BaseModel):
     
     @validator('username')
     def validate_username(cls, v):
-        if v and not v.replace('_', '').replace('-', '').isalnum():
-            raise ValueError('Username can only contain letters, numbers, hyphens, and underscores')
+        """Validate username format"""
+        if v is not None:
+            if not v.replace('_', '').replace('-', '').isalnum():
+                raise ValueError('Username can only contain letters, numbers, hyphens, and underscores')
+        return v
+    
+    @validator('terms_accepted')
+    def validate_terms(cls, v):
+        """Ensure terms are accepted"""
+        if not v:
+            raise ValueError('Terms and conditions must be accepted')
         return v
 
+
 class UserLogin(BaseModel):
-    email: EmailStr
-    password: str
-    remember_me: bool = False
+    """User login schema"""
+    email: EmailStr = Field(..., description="User email address")
+    password: str = Field(..., description="User password")
+    remember_me: bool = Field(False, description="Remember login session")
+    device_info: Optional[Dict[str, Any]] = Field(None, description="Device information")
+
 
 class SocialLogin(BaseModel):
-    provider: SocialProvider
-    token: str
-    device_info: Optional[Dict[str, Any]] = None
+    """Social login schema"""
+    provider: SocialProvider = Field(..., description="Social login provider")
+    token: str = Field(..., description="Social provider access token")
+    device_info: Optional[Dict[str, Any]] = Field(None, description="Device information")
+
+
+class TokenResponse(BaseModel):
+    """Token response schema"""
+    access_token: str = Field(..., description="JWT access token")
+    refresh_token: str = Field(..., description="JWT refresh token")
+    token_type: str = Field("bearer", description="Token type")
+    expires_in: int = Field(..., description="Token expiration time in seconds")
+    user: 'UserResponse' = Field(..., description="User information")
+
+
+class RefreshTokenRequest(BaseModel):
+    """Refresh token request schema"""
+    refresh_token: str = Field(..., description="Refresh token")
+
+
+class PasswordReset(BaseModel):
+    """Password reset request schema"""
+    email: EmailStr = Field(..., description="User email address")
+
+
+class PasswordResetConfirm(BaseModel):
+    """Password reset confirmation schema"""
+    token: str = Field(..., description="Password reset token")
+    new_password: str = Field(..., min_length=8, description="New password")
+    confirm_password: str = Field(..., description="Confirm new password")
+    
+    @validator('confirm_password')
+    def passwords_match(cls, v, values):
+        """Validate password confirmation"""
+        if 'new_password' in values and v != values['new_password']:
+            raise ValueError('Passwords do not match')
+        return v
+    
+    @validator('new_password')
+    def validate_new_password(cls, v):
+        """Validate new password strength"""
+        if len(v) < 8:
+            raise ValueError('Password must be at least 8 characters long')
+        if not any(c.isupper() for c in v):
+            raise ValueError('Password must contain at least one uppercase letter')
+        if not any(c.islower() for c in v):
+            raise ValueError('Password must contain at least one lowercase letter')
+        if not any(c.isdigit() for c in v):
+            raise ValueError('Password must contain at least one digit')
+        return v
+
+
+class PasswordChange(BaseModel):
+    """Password change schema"""
+    current_password: str = Field(..., description="Current password")
+    new_password: str = Field(..., min_length=8, description="New password")
+    confirm_password: str = Field(..., description="Confirm new password")
+    
+    @validator('confirm_password')
+    def passwords_match(cls, v, values):
+        """Validate password confirmation"""
+        if 'new_password' in values and v != values['new_password']:
+            raise ValueError('Passwords do not match')
+        return v
+
+
+class EmailVerification(BaseModel):
+    """Email verification schema"""
+    token: str = Field(..., description="Email verification token")
+
+
+class TwoFactorSetup(BaseModel):
+    """Two-factor authentication setup schema"""
+    secret: str = Field(..., description="2FA secret key")
+    qr_code: str = Field(..., description="QR code for 2FA setup")
+
+
+class TwoFactorVerify(BaseModel):
+    """Two-factor authentication verification schema"""
+    code: str = Field(..., min_length=6, max_length=6, description="2FA verification code")
+    
+    @validator('code')
+    def validate_code(cls, v):
+        """Validate 2FA code format"""
+        if not v.isdigit():
+            raise ValueError('2FA code must be numeric')
+        return v
+
+
+class BiometricSetup(BaseModel):
+    """Biometric authentication setup schema"""
+    public_key: str = Field(..., description="Biometric public key")
+    device_id: str = Field(..., description="Device identifier")
+    biometric_type: str = Field(..., description="Type of biometric (fingerprint, face, etc.)")
+
 
 class UserResponse(BaseModel):
-    id: str
-    email: str
-    username: Optional[str]
-    full_name: Optional[str]
-    avatar_url: Optional[str]
-    bio: Optional[str]
-    country_code: Optional[str]
-    language_preference: str
-    is_active: bool
-    is_verified: bool
-    is_premium: bool
-    is_instructor: bool
-    total_xp: int
-    current_level: int
-    current_streak: int
-    created_at: Optional[datetime]
-    last_login_at: Optional[datetime]
+    """User response schema"""
+    id: str = Field(..., description="User ID")
+    email: str = Field(..., description="User email")
+    username: Optional[str] = Field(None, description="Username")
+    full_name: Optional[str] = Field(None, description="Full name")
+    avatar_url: Optional[str] = Field(None, description="Avatar URL")
+    bio: Optional[str] = Field(None, description="User bio")
+    country_code: Optional[str] = Field(None, description="Country code")
+    language_preference: str = Field("en", description="Language preference")
+    timezone: Optional[str] = Field(None, description="User timezone")
+    is_active: bool = Field(..., description="Account active status")
+    is_verified: bool = Field(..., description="Email verification status")
+    is_premium: bool = Field(..., description="Premium subscription status")
+    is_instructor: bool = Field(..., description="Instructor status")
+    total_xp: int = Field(0, description="Total experience points")
+    current_level: int = Field(1, description="Current level")
+    current_streak: int = Field(0, description="Current learning streak")
+    longest_streak: int = Field(0, description="Longest learning streak")
+    created_at: datetime = Field(..., description="Account creation date")
+    last_login_at: Optional[datetime] = Field(None, description="Last login date")
     
     class Config:
         from_attributes = True
 
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
-    expires_in: int
-    user: UserResponse
-
-class PasswordReset(BaseModel):
-    email: EmailStr
-
-class PasswordResetConfirm(BaseModel):
-    token: str
-    new_password: str = Field(..., min_length=8, max_length=100)
-    
-    @validator('new_password')
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
-
-class PasswordChange(BaseModel):
-    current_password: str
-    new_password: str = Field(..., min_length=8, max_length=100)
-    
-    @validator('new_password')
-    def validate_password(cls, v):
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
-
-class EmailVerification(BaseModel):
-    token: str
-
-class TwoFactorSetup(BaseModel):
-    secret: str
-    qr_code: str
-
-class TwoFactorVerify(BaseModel):
-    code: str
-
-class BiometricSetup(BaseModel):
-    device_id: str
-    public_key: str
-    device_name: Optional[str] = None
-
-class BiometricAuth(BaseModel):
-    device_id: str
-    signature: str
-    challenge: str
-
-class DeviceInfo(BaseModel):
-    device_id: str
-    device_name: str
-    device_type: str  # mobile, desktop, tablet, watch
-    os: str
-    browser: Optional[str] = None
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-
-class SessionInfo(BaseModel):
-    id: str
-    device_info: DeviceInfo
-    created_at: datetime
-    last_active: datetime
-    is_current: bool
-
-class UserPreferences(BaseModel):
-    language_preference: str = "en"
-    timezone: Optional[str] = None
-    learning_style: Optional[str] = None  # visual, auditory, kinesthetic
-    difficulty_preference: str = "intermediate"
-    daily_goal_minutes: int = 30
-    notifications_enabled: bool = True
-    email_notifications: bool = True
-    push_notifications: bool = True
-    accessibility_settings: Optional[Dict[str, Any]] = None
 
 class UserUpdate(BaseModel):
-    full_name: Optional[str] = Field(None, max_length=100)
+    """User profile update schema"""
+    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
     username: Optional[str] = Field(None, min_length=3, max_length=30)
     bio: Optional[str] = Field(None, max_length=500)
-    avatar_url: Optional[str] = None
-    country_code: Optional[str] = Field(None, max_length=2)
-    preferences: Optional[UserPreferences] = None
+    country_code: Optional[str] = Field(None, min_length=2, max_length=2)
+    language_preference: Optional[str] = Field(None)
+    timezone: Optional[str] = Field(None)
+    date_of_birth: Optional[datetime] = Field(None)
+    learning_style: Optional[str] = Field(None)
+    difficulty_preference: Optional[str] = Field(None)
+    daily_goal_minutes: Optional[int] = Field(None, ge=5, le=480)
+    accessibility_settings: Optional[Dict[str, Any]] = Field(None)
     
     @validator('username')
     def validate_username(cls, v):
-        if v and not v.replace('_', '').replace('-', '').isalnum():
-            raise ValueError('Username can only contain letters, numbers, hyphens, and underscores')
+        """Validate username format"""
+        if v is not None:
+            if not v.replace('_', '').replace('-', '').isalnum():
+                raise ValueError('Username can only contain letters, numbers, hyphens, and underscores')
         return v
+
+
+class DeviceInfo(BaseModel):
+    """Device information schema"""
+    device_id: str = Field(..., description="Unique device identifier")
+    device_type: str = Field(..., description="Device type (mobile, tablet, desktop, vr, etc.)")
+    platform: str = Field(..., description="Platform (ios, android, web, windows, etc.)")
+    app_version: str = Field(..., description="App version")
+    os_version: str = Field(..., description="Operating system version")
+    screen_resolution: Optional[str] = Field(None, description="Screen resolution")
+    user_agent: Optional[str] = Field(None, description="User agent string")
+
+
+class SessionInfo(BaseModel):
+    """Session information schema"""
+    session_id: str = Field(..., description="Session identifier")
+    device_info: DeviceInfo = Field(..., description="Device information")
+    ip_address: str = Field(..., description="IP address")
+    location: Optional[Dict[str, Any]] = Field(None, description="Approximate location")
+    created_at: datetime = Field(..., description="Session creation time")
+    last_activity: datetime = Field(..., description="Last activity time")
+    is_active: bool = Field(..., description="Session active status")
+
+
+class SecurityEvent(BaseModel):
+    """Security event schema"""
+    event_type: str = Field(..., description="Type of security event")
+    description: str = Field(..., description="Event description")
+    ip_address: str = Field(..., description="IP address")
+    user_agent: Optional[str] = Field(None, description="User agent")
+    timestamp: datetime = Field(..., description="Event timestamp")
+    severity: str = Field(..., description="Event severity (low, medium, high, critical)")
+
+
+# Update forward references
+TokenResponse.model_rebuild()
