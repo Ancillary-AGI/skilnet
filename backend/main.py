@@ -13,15 +13,12 @@ from pathlib import Path
 
 # Import core modules
 from app.core.config import settings
-from app.core.database import engine, Base
 from app.core.logging import setup_logging
 from app.api.v1.api import api_router
+from app.services.initialization_service import startup_initialization, system_health_check
 
 # Setup logging
 setup_logging()
-
-# Create database tables
-Base.metadata.create_all(bind=engine)
 
 # Security scheme
 security = HTTPBearer()
@@ -31,7 +28,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     print("🚀 Starting EduVerse API...")
+    
+    # Initialize all systems
+    init_status = await startup_initialization()
+    print(f"📊 Initialization Status: {init_status['status']}")
+    
     yield
+    
     # Shutdown
     print("🔄 Shutting down EduVerse API...")
 
@@ -166,24 +169,23 @@ async def database_health_check():
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
     """Comprehensive health check"""
+    health_status = await system_health_check()
+    
     return {
-        "status": "healthy",
+        "status": health_status["overall"],
         "service": "EduVerse API",
         "version": "2.0.0",
-        "components": {
-            "database": "healthy",
-            "redis": "healthy",  # Add Redis check if using
-            "ai_services": "healthy",  # Add AI service checks
-            "file_storage": "healthy"  # Add storage checks
-        },
+        "components": health_status["systems"],
         "features": {
             "authentication": "enabled",
             "social_login": "enabled",
             "real_time": "enabled",
             "ai_powered": "enabled",
             "vr_ar": "enabled",
-            "blockchain": "enabled"
-        }
+            "auto_updates": "enabled",
+            "cloud_storage": "enabled"
+        },
+        "timestamp": health_status["timestamp"]
     }
 
 # API Information endpoint

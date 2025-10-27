@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL Database (Recommended)
   postgres:
     image: postgres:15-alpine
     container_name: eduverse_postgres
@@ -13,12 +13,52 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./backend/sql/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U eduverse_user -d eduverse"]
       interval: 10s
       timeout: 5s
       retries: 5
+
+  # MySQL Database (Alternative)
+  mysql:
+    image: mysql:8.0
+    container_name: eduverse_mysql
+    environment:
+      MYSQL_DATABASE: eduverse
+      MYSQL_USER: eduverse_user
+      MYSQL_PASSWORD: eduverse_password
+      MYSQL_ROOT_PASSWORD: root_password
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - mysql
+
+  # MongoDB Database (Alternative)
+  mongodb:
+    image: mongo:7.0
+    container_name: eduverse_mongodb
+    environment:
+      MONGO_INITDB_DATABASE: eduverse
+      MONGO_INITDB_ROOT_USERNAME: eduverse_user
+      MONGO_INITDB_ROOT_PASSWORD: eduverse_password
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - mongodb
 
   # Redis for caching and sessions
   redis:
@@ -42,11 +82,14 @@ services:
       dockerfile: Dockerfile
     container_name: eduverse_backend
     environment:
+      - DB_TYPE=postgresql
       - DATABASE_URL=postgresql+asyncpg://eduverse_user:eduverse_password@postgres:5432/eduverse
       - REDIS_URL=redis://redis:6379
       - SECRET_KEY=your-super-secret-key-change-in-production
       - DEBUG=true
       - ALLOWED_HOSTS=["*"]
+      - STORAGE_PROVIDER=local
+      - LOCAL_STORAGE_PATH=/app/uploads
     ports:
       - "8000:8000"
     volumes:
@@ -240,6 +283,8 @@ services:
 
 volumes:
   postgres_data:
+  mysql_data:
+  mongodb_data:
   redis_data:
   prometheus_data:
   grafana_data:

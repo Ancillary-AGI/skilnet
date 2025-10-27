@@ -2,7 +2,10 @@
 Configuration settings for EduVerse platform
 """
 
-from pydantic_settings import BaseSettings
+try:
+    from pydantic_settings import BaseSettings
+except ImportError:
+    from pydantic import BaseSettings
 from typing import List, Optional
 import os
 

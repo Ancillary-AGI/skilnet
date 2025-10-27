@@ -4,9 +4,21 @@ uvicorn[standard]==0.31.0
 pydantic==2.8.2
 pydantic-settings==2.4.0
 
-# Database
+# Database - PostgreSQL (recommended)
 sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
 alembic==1.13.2
+
+# Database - MySQL (optional)
+aiomysql==0.2.0
+PyMySQL==1.1.1
+
+# Database - MongoDB (optional)
+motor==3.6.0
+pymongo==4.10.1
+
+# Database - SQLite (development)
+aiosqlite==0.20.0
 
 # Authentication & Security
 python-jose[cryptography]==3.3.0
@@ -29,8 +41,18 @@ Pillow==11.0.0
 # WebRTC
 websockets==13.1
 
-# File storage
+# Cloud Storage - AWS S3
+aioboto3==13.2.0
 boto3==1.35.34
+
+# Cloud Storage - Google Cloud (optional)
+google-cloud-storage==2.18.2
+
+# Cloud Storage - Azure (optional)
+azure-storage-blob==12.23.1
+
+# File handling
+aiofiles==24.1.0
 
 # Testing
 pytest==8.3.3

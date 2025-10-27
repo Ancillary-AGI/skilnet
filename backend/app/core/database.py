@@ -1,115 +1,129 @@
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
-import os
+"""
+Database module with flexible backend support and cloud storage integration
+"""
+
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import AsyncGenerator
-from contextlib import asynccontextmanager
-from pydantic import BaseModel as PydanticBaseModel
-
-# Create Base for all models
-Base = declarative_base()
-
-# Database URL - using SQLite for simplicity
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./database.db")
-
-# Create async engine
-engine = create_async_engine(
-    DATABASE_URL.replace("sqlite://", "sqlite+aiosqlite://"),
-    echo=True,  # Set to False in production
-    future=True,
+from .database_config import (
+    Base, async_engine, AsyncSessionLocal, get_db, create_tables, drop_tables,
+    db_config, DatabaseType
 )
 
-# Create session factory
-async_session = sessionmaker(
-    engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-)
+# Re-export for backward compatibility
+__all__ = [
+    "Base", "async_engine", "AsyncSessionLocal", "get_db", 
+    "create_tables", "drop_tables", "db_config", "DatabaseType"
+]
 
-async def get_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency to get database session"""
-    async with async_session() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
+# Database utilities
+async def init_database():
+    """Initialize database with tables"""
+    print(f"🗄️  Initializing {db_config.DB_TYPE.value} database...")
+    
+    if db_config.DB_TYPE == DatabaseType.MONGODB:
+        # MongoDB doesn't use SQLAlchemy tables
+        print("📄 MongoDB initialized (no table creation needed)")
+        return
+    
+    try:
+        await create_tables()
+        print("✅ Database tables created successfully")
+    except Exception as e:
+        print(f"❌ Database initialization failed: {e}")
+        raise
 
-async def create_tables():
-    """Create all database tables"""
-    from app.models.user import User
-    from app.models.course import Course
-    from app.models.category import Category
-    from app.models.profile import UserProfile
-    from app.models.subscription import Subscription
+async def check_database_connection():
+    """Check if database connection is working"""
+    try:
+        async with AsyncSessionLocal() as session:
+            if db_config.DB_TYPE == DatabaseType.SQLITE:
+                await session.execute("SELECT 1")
+            elif db_config.DB_TYPE == DatabaseType.POSTGRESQL:
+                await session.execute("SELECT version()")
+            elif db_config.DB_TYPE == DatabaseType.MYSQL:
+                await session.execute("SELECT VERSION()")
+            
+        return True
+    except Exception as e:
+        print(f"❌ Database connection failed: {e}")
+        return False
 
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+def get_database_info():
+    """Get current database configuration info"""
+    return {
+        "type": db_config.DB_TYPE.value,
+        "url": db_config.get_database_url().split("@")[-1] if "@" in db_config.get_database_url() else "local",
+        "pool_size": db_config.DB_POOL_SIZE,
+        "ssl_enabled": db_config.DB_SSL_MODE != "disable"
+    }
 
-# Database Configuration Classes
-class DatabaseConfig:
-    def __init__(self, database_url: str = None, is_sqlite: bool = True):
-        self.database_url = database_url or DATABASE_URL
-        self.is_sqlite = is_sqlite
+# MongoDB support (if needed)
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from pymongo.errors import ConnectionFailure
+    
+    class MongoDatabase:
+        def __init__(self):
+            self.client = None
+            self.database = None
+        
+        async def connect(self):
+            """Connect to MongoDB"""
+            if db_config.DB_TYPE == DatabaseType.MONGODB:
+                self.client = AsyncIOMotorClient(db_config.get_database_url())
+                self.database = self.client[db_config.MONGODB_DB]
+                
+                # Test connection
+                await self.client.admin.command('ping')
+                print("✅ MongoDB connected successfully")
+        
+        async def disconnect(self):
+            """Disconnect from MongoDB"""
+            if self.client:
+                self.client.close()
+        
+        def get_collection(self, name: str):
+            """Get MongoDB collection"""
+            if self.database:
+                return self.database[name]
+            return None
+    
+    # Global MongoDB instance
+    mongo_db = MongoDatabase()
+    
+except ImportError:
+    # MongoDB dependencies not installed
+    mongo_db = None
+    print("💡 MongoDB support not available (install motor and pymongo)")
 
-class DatabaseConnection:
-    _instances = {}
-
-    @classmethod
-    def get_instance(cls, config: DatabaseConfig):
-        key = config.database_url
-        if key not in cls._instances:
-            cls._instances[key] = cls(config)
-        return cls._instances[key]
-
-    def __init__(self, config: DatabaseConfig):
-        self.config = config
-        self.engine = create_async_engine(
-            config.database_url.replace("sqlite://", "sqlite+aiosqlite://") if config.is_sqlite else config.database_url,
-            echo=True,
-            future=True,
-        )
-
-    @asynccontextmanager
-    async def get_connection(self):
-        async with self.engine.begin() as conn:
-            yield conn
-
-class Field:
-    def __init__(self, field_type: str, primary_key: bool = False, nullable: bool = True,
-                 default=None, index: bool = False, autoincrement: bool = False, unique: bool = False):
-        self.field_type = field_type
-        self.primary_key = primary_key
-        self.nullable = nullable
-        self.default = default
-        self.index = index
-        self.autoincrement = autoincrement
-        self.unique = unique
-
-    def sql_definition(self, name: str, is_sqlite: bool = True) -> str:
-        """Generate SQL column definition"""
-        sql = f"{name} {self.field_type}"
-
-        if self.unique:
-            sql += " UNIQUE"
-
-        if self.primary_key:
-            sql += " PRIMARY KEY"
-            if is_sqlite and self.autoincrement:
-                sql += " AUTOINCREMENT"
-
-        if not self.nullable:
-            sql += " NOT NULL"
-
-        if self.default is not None:
-            if isinstance(self.default, str):
-                sql += f" DEFAULT '{self.default}'"
-            elif isinstance(self.default, bool):
-                sql += f" DEFAULT {1 if self.default else 0}"
-            else:
-                sql += f" DEFAULT {self.default}"
-
-        return sql
+# Database migration utilities
+class DatabaseMigration:
+    """Handle database migrations across different backends"""
+    
+    @staticmethod
+    async def migrate_to_postgres():
+        """Migrate from SQLite to PostgreSQL"""
+        print("🔄 Migrating to PostgreSQL...")
+        # Implementation would depend on specific migration needs
+        pass
+    
+    @staticmethod
+    async def migrate_to_mysql():
+        """Migrate from current DB to MySQL"""
+        print("🔄 Migrating to MySQL...")
+        # Implementation would depend on specific migration needs
+        pass
+    
+    @staticmethod
+    async def backup_database():
+        """Create database backup"""
+        print("💾 Creating database backup...")
+        # Implementation would depend on database type
+        pass
+    
+    @staticmethod
+    async def restore_database(backup_path: str):
+        """Restore database from backup"""
+        print(f"📥 Restoring database from {backup_path}...")
+        # Implementation would depend on database type
+        pass
