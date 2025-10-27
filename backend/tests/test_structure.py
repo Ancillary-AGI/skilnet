@@ -9,6 +9,9 @@ def test_file_structure():
     """Test that required files exist"""
     print("📁 Testing file structure...")
     
+    # Change to backend directory for relative path checking
+    os.chdir(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    
     required_files = [
         "main.py",
         "app/main.py", 
@@ -104,34 +107,7 @@ def test_app_structure():
     print(f"\n📊 Directory Summary: {len(found_dirs)}/{len(directories)} directories found")
     return len(missing_dirs) == 0
 
-def test_configuration():
-    """Test configuration files"""
-    print("\n⚙️  Testing configuration...")
-    
-    config_files = [
-        ("requirements.txt", "Python dependencies"),
-        ("Dockerfile", "Docker configuration"),
-        (".gitignore", "Git ignore rules"),
-        ("README.md", "Documentation"),
-    ]
-    
-    for file_path, description in config_files:
-        if os.path.exists(file_path):
-            print(f"✅ CONFIG - {description}: {file_path}")
-            
-            # Check file size
-            size = os.path.getsize(file_path)
-            print(f"    Size: {size} bytes")
-            
-            if file_path == "requirements.txt":
-                with open(file_path, 'r') as f:
-                    lines = f.readlines()
-                    print(f"    Dependencies: {len(lines)} packages")
-        else:
-            print(f"❌ MISSING CONFIG - {description}: {file_path}")
-
-def main():
-    """Run all tests"""
+if __name__ == "__main__":
     print("🎓 EduVerse Backend Structure Test")
     print("=" * 50)
     
@@ -140,24 +116,10 @@ def main():
     all_passed &= test_file_structure()
     all_passed &= test_imports()
     all_passed &= test_app_structure()
-    test_configuration()
     
     print("\n" + "=" * 50)
     
     if all_passed:
         print("✨ All critical tests passed!")
-        print("\n🚀 Ready to run the application:")
-        print("   python main.py")
-        print("\n🔧 Or with uvicorn:")
-        print("   uvicorn main:app --reload")
     else:
         print("⚠️  Some tests failed. Please check the missing files/directories.")
-    
-    print("\n📚 Next steps:")
-    print("   1. Install dependencies: pip install -r requirements.txt")
-    print("   2. Set up environment variables")
-    print("   3. Run the application")
-    print("   4. Test API endpoints")
-
-if __name__ == "__main__":
-    main()

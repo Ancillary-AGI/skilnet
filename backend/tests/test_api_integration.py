@@ -1,5 +1,5 @@
 """
-Basic test script for EduVerse API
+API integration tests for EduVerse platform
 """
 
 import sys
@@ -62,55 +62,11 @@ def test_api_endpoints():
     except Exception as e:
         print(f"❌ ERROR - App updates: {str(e)}")
 
-def test_file_structure():
-    """Test that required files exist"""
-    print("\n📁 Testing file structure...")
-    
-    required_files = [
-        "main.py",
-        "app/main.py",
-        "app/core/config.py",
-        "app/core/database.py",
-        "app/api/v1/api.py",
-        "app/models/user.py",
-        "requirements.txt",
-    ]
-    
-    for file_path in required_files:
-        if os.path.exists(file_path):
-            print(f"✅ FOUND - {file_path}")
-        else:
-            print(f"❌ MISSING - {file_path}")
-
-def test_imports():
-    """Test that key modules can be imported"""
-    print("\n📦 Testing imports...")
-    
-    modules_to_test = [
-        ("fastapi", "FastAPI framework"),
-        ("sqlalchemy", "SQLAlchemy ORM"),
-        ("pydantic", "Pydantic validation"),
-        ("uvicorn", "ASGI server"),
-    ]
-    
-    for module_name, description in modules_to_test:
-        try:
-            __import__(module_name)
-            print(f"✅ IMPORT - {description}: {module_name}")
-        except ImportError:
-            print(f"❌ MISSING - {description}: {module_name}")
-
 if __name__ == "__main__":
-    print("🎓 EduVerse API Test Suite")
+    print("🎓 EduVerse API Integration Test Suite")
     print("=" * 50)
     
-    test_file_structure()
-    test_imports()
     test_api_endpoints()
     
     print("\n" + "=" * 50)
-    print("✨ Test suite completed!")
-    print("\n💡 To run the API server:")
-    print("   python main.py")
-    print("\n💡 To run with uvicorn:")
-    print("   uvicorn main:app --reload")
+    print("✨ Integration test suite completed!")
