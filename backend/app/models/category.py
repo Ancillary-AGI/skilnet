@@ -2,8 +2,9 @@
 Category model for EduVerse platform
 """
 
-from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer
+from sqlalchemy import Column, String, Text, Boolean, DateTime, Integer, ForeignKey
 from sqlalchemy.sql import func
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 import uuid
 
@@ -30,6 +31,9 @@ class Category(Base):
     # Timestamps
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
-    
+
+    # Relationships
+    courses = relationship("Course", back_populates="category")
+
     def __repr__(self):
         return f"<Category(id={self.id}, name={self.name})>"

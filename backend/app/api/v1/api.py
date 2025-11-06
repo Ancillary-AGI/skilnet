@@ -9,9 +9,12 @@ from typing import List, Optional
 import logging
 import time
 
+# Import models
+from app.models.user import User
+
 # Import endpoint modules
 from .endpoints import (
-    auth, courses, analytics, collaboration,
+    auth, courses, enrollments, content, analytics, collaboration,
     certificates, adaptive_learning, payments,
     categories, translations, websocket, app_updates
 )
@@ -32,6 +35,20 @@ api_router.include_router(
     prefix="/courses",
     tags=["Courses"],
     responses={404: {"description": "Course not found"}}
+)
+
+api_router.include_router(
+    enrollments.router,
+    prefix="/enrollments",
+    tags=["Enrollments"],
+    responses={404: {"description": "Enrollment not found"}}
+)
+
+api_router.include_router(
+    content.router,
+    prefix="/content",
+    tags=["Content"],
+    responses={404: {"description": "Content not found"}}
 )
 
 api_router.include_router(

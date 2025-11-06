@@ -63,23 +63,25 @@ class InitializationService:
     
     async def _initialize_storage(self):
         """Initialize cloud storage system"""
+        global storage_service
+
         try:
             print(f"☁️  Initializing {storage_config.STORAGE_PROVIDER.value} storage...")
-            
+
             # Test storage by uploading a small test file
             test_content = b"EduVerse storage test"
             test_path = "system/test.txt"
-            
+
             url = await storage_service.upload_file(test_path, test_content, "text/plain")
             print(f"✅ Storage test successful: {url}")
-            
+
             # Clean up test file
             await storage_service.delete_file(test_path)
-            
+
             self.initialization_status["storage"] = True
-            
+
             print(f"📁 Storage Info: {storage_config.STORAGE_PROVIDER.value} | CDN: {storage_config.CDN_ENABLED}")
-            
+
         except Exception as e:
             print(f"❌ Storage initialization failed: {e}")
             # Fall back to local storage if cloud storage fails
@@ -89,7 +91,6 @@ class InitializationService:
                 # Retry with local storage
                 try:
                     from app.core.cloud_storage import LocalStorageService
-                    global storage_service
                     storage_service = LocalStorageService(storage_config)
                     await self._initialize_storage()
                 except Exception as fallback_error:

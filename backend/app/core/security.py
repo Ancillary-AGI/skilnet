@@ -11,11 +11,14 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.models.user import User
-from app.core.database import async_session
+from app.core.database import get_db
 
-# Password hashing - using SHA256 for now due to bcrypt issues
+# Password hashing
+from passlib.context import CryptContext
 import hashlib
 import secrets
+
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
 SECRET_KEY = settings.SECRET_KEY
@@ -449,13 +452,14 @@ def sanitize_user_data(data: Dict[str, Any]) -> Dict[str, Any]:
 # FastAPI dependency functions
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 
 security = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(async_session)
+    db: AsyncSession = Depends(get_db)
 ) -> User:
     """Get current authenticated user"""
     payload = verify_token(credentials.credentials)
@@ -473,7 +477,8 @@ async def get_current_user(
             detail="Invalid token payload"
         )
 
-    user = db.query(User).filter(User.id == user_id).first()
+    result = await db.execute(select(User).where(User.id == user_id))
+    user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

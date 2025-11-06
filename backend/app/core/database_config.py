@@ -5,10 +5,7 @@ Database configuration with support for multiple database backends
 import os
 from enum import Enum
 from typing import Optional, Dict, Any
-try:
-    from pydantic_settings import BaseSettings
-except ImportError:
-    from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, declarative_base
@@ -48,7 +45,7 @@ class DatabaseConfig(BaseSettings):
     MONGODB_PASSWORD: Optional[str] = None
     
     # SQLite settings (development/testing)
-    SQLITE_PATH: str = "./database.db"
+    SQLITE_PATH: str = os.getenv("SQLITE_PATH", "./database.db")
     
     # Cloud database URLs (override individual settings)
     DATABASE_URL: Optional[str] = None

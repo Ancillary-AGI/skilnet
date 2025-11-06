@@ -2,74 +2,70 @@
 Authentication schemas for EduVerse platform
 """
 
-from pydantic import BaseModel, EmailStr, Field, validator
+from pydantic import BaseModel, Field, EmailStr
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
 
 
 class SocialProvider(str, Enum):
+    """Social login providers"""
     GOOGLE = "google"
     APPLE = "apple"
     FACEBOOK = "facebook"
-    MICROSOFT = "microsoft"
 
 
-class UserRegister(BaseModel):
-    """User registration schema"""
+class UserBase(BaseModel):
+    """Base user schema"""
     email: EmailStr = Field(..., description="User email address")
-    password: str = Field(..., min_length=8, description="User password (min 8 characters)")
-    full_name: str = Field(..., min_length=2, max_length=100, description="User full name")
-    username: Optional[str] = Field(None, min_length=3, max_length=30, description="Username (optional)")
-    country_code: Optional[str] = Field(None, min_length=2, max_length=2, description="ISO country code")
-    language_preference: str = Field("en", description="Preferred language")
-    timezone: Optional[str] = Field(None, description="User timezone")
-    date_of_birth: Optional[datetime] = Field(None, description="Date of birth")
-    marketing_consent: bool = Field(False, description="Marketing emails consent")
-    terms_accepted: bool = Field(..., description="Terms and conditions acceptance")
-    
-    @validator('password')
-    def validate_password(cls, v):
-        """Validate password strength"""
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
-    
-    @validator('username')
-    def validate_username(cls, v):
-        """Validate username format"""
-        if v is not None:
-            if not v.replace('_', '').replace('-', '').isalnum():
-                raise ValueError('Username can only contain letters, numbers, hyphens, and underscores')
-        return v
-    
-    @validator('terms_accepted')
-    def validate_terms(cls, v):
-        """Ensure terms are accepted"""
-        if not v:
-            raise ValueError('Terms and conditions must be accepted')
-        return v
+    username: str = Field(..., min_length=3, max_length=50, description="Username")
+    full_name: str = Field(..., min_length=1, max_length=100, description="Full name")
+    is_instructor: bool = Field(False, description="Whether user is an instructor")
 
 
-class UserLogin(BaseModel):
-    """User login schema"""
-    email: EmailStr = Field(..., description="User email address")
+class UserCreate(UserBase):
+    """Schema for creating a new user"""
+    password: str = Field(..., min_length=8, description="User password")
+
+
+class UserUpdate(BaseModel):
+    """Schema for updating user information"""
+    email: Optional[EmailStr] = Field(None, description="User email address")
+    username: Optional[str] = Field(None, min_length=3, max_length=50, description="Username")
+    first_name: Optional[str] = Field(None, min_length=1, max_length=50, description="First name")
+    last_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Last name")
+    is_instructor: Optional[bool] = Field(None, description="Whether user is an instructor")
+    is_active: Optional[bool] = Field(None, description="Whether user account is active")
+
+
+class UserResponse(UserBase):
+    """User response schema"""
+    id: str = Field(..., description="User ID")
+    created_at: datetime = Field(..., description="Account creation timestamp")
+    updated_at: datetime = Field(..., description="Last update timestamp")
+    last_login: Optional[datetime] = Field(None, description="Last login timestamp")
+    is_active: bool = Field(True, description="Whether user account is active")
+
+    class Config:
+        from_attributes = True
+
+
+class UserProfileResponse(UserResponse):
+    """Extended user profile response"""
+    bio: Optional[str] = Field(None, description="User biography")
+    avatar_url: Optional[str] = Field(None, description="Profile picture URL")
+    website: Optional[str] = Field(None, description="Personal website")
+    location: Optional[str] = Field(None, description="User location")
+    social_links: Optional[dict] = Field(None, description="Social media links")
+    preferences: Optional[dict] = Field(None, description="User preferences")
+
+
+class LoginRequest(BaseModel):
+    """Login request schema"""
+    email: EmailStr = Field(..., description="User email")
     password: str = Field(..., description="User password")
-    remember_me: bool = Field(False, description="Remember login session")
-    device_info: Optional[Dict[str, Any]] = Field(None, description="Device information")
 
 
-class SocialLogin(BaseModel):
-    """Social login schema"""
-    provider: SocialProvider = Field(..., description="Social login provider")
-    token: str = Field(..., description="Social provider access token")
-    device_info: Optional[Dict[str, Any]] = Field(None, description="Device information")
 
 
 class TokenResponse(BaseModel):
@@ -78,7 +74,7 @@ class TokenResponse(BaseModel):
     refresh_token: str = Field(..., description="JWT refresh token")
     token_type: str = Field("bearer", description="Token type")
     expires_in: int = Field(..., description="Token expiration time in seconds")
-    user: 'UserResponse' = Field(..., description="User information")
+    user: UserResponse = Field(..., description="User information")
 
 
 class RefreshTokenRequest(BaseModel):
@@ -86,162 +82,135 @@ class RefreshTokenRequest(BaseModel):
     refresh_token: str = Field(..., description="Refresh token")
 
 
-class PasswordReset(BaseModel):
+class PasswordResetRequest(BaseModel):
     """Password reset request schema"""
     email: EmailStr = Field(..., description="User email address")
 
 
 class PasswordResetConfirm(BaseModel):
     """Password reset confirmation schema"""
-    token: str = Field(..., description="Password reset token")
+    token: str = Field(..., description="Reset token")
     new_password: str = Field(..., min_length=8, description="New password")
-    confirm_password: str = Field(..., description="Confirm new password")
-    
-    @validator('confirm_password')
-    def passwords_match(cls, v, values):
-        """Validate password confirmation"""
-        if 'new_password' in values and v != values['new_password']:
-            raise ValueError('Passwords do not match')
-        return v
-    
-    @validator('new_password')
-    def validate_new_password(cls, v):
-        """Validate new password strength"""
-        if len(v) < 8:
-            raise ValueError('Password must be at least 8 characters long')
-        if not any(c.isupper() for c in v):
-            raise ValueError('Password must contain at least one uppercase letter')
-        if not any(c.islower() for c in v):
-            raise ValueError('Password must contain at least one lowercase letter')
-        if not any(c.isdigit() for c in v):
-            raise ValueError('Password must contain at least one digit')
-        return v
 
 
-class PasswordChange(BaseModel):
-    """Password change schema"""
+class ChangePasswordRequest(BaseModel):
+    """Change password request schema"""
     current_password: str = Field(..., description="Current password")
     new_password: str = Field(..., min_length=8, description="New password")
-    confirm_password: str = Field(..., description="Confirm new password")
-    
-    @validator('confirm_password')
-    def passwords_match(cls, v, values):
-        """Validate password confirmation"""
-        if 'new_password' in values and v != values['new_password']:
-            raise ValueError('Passwords do not match')
-        return v
 
 
-class EmailVerification(BaseModel):
-    """Email verification schema"""
-    token: str = Field(..., description="Email verification token")
+class EmailVerificationRequest(BaseModel):
+    """Email verification request schema"""
+    email: EmailStr = Field(..., description="Email to verify")
 
 
-class TwoFactorSetup(BaseModel):
-    """Two-factor authentication setup schema"""
-    secret: str = Field(..., description="2FA secret key")
-    qr_code: str = Field(..., description="QR code for 2FA setup")
+class EmailVerificationConfirm(BaseModel):
+    """Email verification confirmation schema"""
+    token: str = Field(..., description="Verification token")
 
 
-class TwoFactorVerify(BaseModel):
-    """Two-factor authentication verification schema"""
-    code: str = Field(..., min_length=6, max_length=6, description="2FA verification code")
-    
-    @validator('code')
-    def validate_code(cls, v):
-        """Validate 2FA code format"""
-        if not v.isdigit():
-            raise ValueError('2FA code must be numeric')
-        return v
+class SocialLoginRequest(BaseModel):
+    """Social login request schema"""
+    provider: str = Field(..., description="Social provider (google, apple, facebook)")
+    access_token: str = Field(..., description="OAuth access token")
+    id_token: Optional[str] = Field(None, description="OAuth ID token")
 
 
-class BiometricSetup(BaseModel):
-    """Biometric authentication setup schema"""
-    public_key: str = Field(..., description="Biometric public key")
-    device_id: str = Field(..., description="Device identifier")
-    biometric_type: str = Field(..., description="Type of biometric (fingerprint, face, etc.)")
+class TwoFactorSetupResponse(BaseModel):
+    """2FA setup response schema"""
+    secret: str = Field(..., description="TOTP secret")
+    qr_code_url: str = Field(..., description="QR code URL for authenticator apps")
+    backup_codes: list[str] = Field(..., description="Backup recovery codes")
 
 
-class UserResponse(BaseModel):
-    """User response schema"""
-    id: str = Field(..., description="User ID")
-    email: str = Field(..., description="User email")
-    username: Optional[str] = Field(None, description="Username")
-    full_name: Optional[str] = Field(None, description="Full name")
-    avatar_url: Optional[str] = Field(None, description="Avatar URL")
-    bio: Optional[str] = Field(None, description="User bio")
-    country_code: Optional[str] = Field(None, description="Country code")
-    language_preference: str = Field("en", description="Language preference")
-    timezone: Optional[str] = Field(None, description="User timezone")
-    is_active: bool = Field(..., description="Account active status")
-    is_verified: bool = Field(..., description="Email verification status")
-    is_premium: bool = Field(..., description="Premium subscription status")
-    is_instructor: bool = Field(..., description="Instructor status")
-    total_xp: int = Field(0, description="Total experience points")
-    current_level: int = Field(1, description="Current level")
-    current_streak: int = Field(0, description="Current learning streak")
-    longest_streak: int = Field(0, description="Longest learning streak")
-    created_at: datetime = Field(..., description="Account creation date")
-    last_login_at: Optional[datetime] = Field(None, description="Last login date")
-    
-    class Config:
-        from_attributes = True
+class TwoFactorVerifyRequest(BaseModel):
+    """2FA verification request schema"""
+    code: str = Field(..., min_length=6, max_length=6, description="TOTP code")
 
 
-class UserUpdate(BaseModel):
-    """User profile update schema"""
-    full_name: Optional[str] = Field(None, min_length=2, max_length=100)
-    username: Optional[str] = Field(None, min_length=3, max_length=30)
-    bio: Optional[str] = Field(None, max_length=500)
-    country_code: Optional[str] = Field(None, min_length=2, max_length=2)
-    language_preference: Optional[str] = Field(None)
-    timezone: Optional[str] = Field(None)
-    date_of_birth: Optional[datetime] = Field(None)
-    learning_style: Optional[str] = Field(None)
-    difficulty_preference: Optional[str] = Field(None)
-    daily_goal_minutes: Optional[int] = Field(None, ge=5, le=480)
-    accessibility_settings: Optional[Dict[str, Any]] = Field(None)
-    
-    @validator('username')
-    def validate_username(cls, v):
-        """Validate username format"""
-        if v is not None:
-            if not v.replace('_', '').replace('-', '').isalnum():
-                raise ValueError('Username can only contain letters, numbers, hyphens, and underscores')
-        return v
+class TwoFactorDisableRequest(BaseModel):
+    """2FA disable request schema"""
+    password: str = Field(..., description="User password for confirmation")
 
 
-class DeviceInfo(BaseModel):
-    """Device information schema"""
-    device_id: str = Field(..., description="Unique device identifier")
-    device_type: str = Field(..., description="Device type (mobile, tablet, desktop, vr, etc.)")
-    platform: str = Field(..., description="Platform (ios, android, web, windows, etc.)")
-    app_version: str = Field(..., description="App version")
-    os_version: str = Field(..., description="Operating system version")
-    screen_resolution: Optional[str] = Field(None, description="Screen resolution")
-    user_agent: Optional[str] = Field(None, description="User agent string")
+class AccountDeletionRequest(BaseModel):
+    """Account deletion request schema"""
+    password: str = Field(..., description="User password for confirmation")
+    reason: Optional[str] = Field(None, description="Reason for account deletion")
 
 
-class SessionInfo(BaseModel):
-    """Session information schema"""
-    session_id: str = Field(..., description="Session identifier")
-    device_info: DeviceInfo = Field(..., description="Device information")
-    ip_address: str = Field(..., description="IP address")
-    location: Optional[Dict[str, Any]] = Field(None, description="Approximate location")
-    created_at: datetime = Field(..., description="Session creation time")
-    last_activity: datetime = Field(..., description="Last activity time")
-    is_active: bool = Field(..., description="Session active status")
+class PasskeyRegistrationRequest(BaseModel):
+    """Passkey registration request schema"""
+    challenge: str = Field(..., description="Base64 encoded challenge")
+    user_id: str = Field(..., description="User ID for registration")
 
 
-class SecurityEvent(BaseModel):
-    """Security event schema"""
-    event_type: str = Field(..., description="Type of security event")
-    description: str = Field(..., description="Event description")
-    ip_address: str = Field(..., description="IP address")
-    user_agent: Optional[str] = Field(None, description="User agent")
-    timestamp: datetime = Field(..., description="Event timestamp")
-    severity: str = Field(..., description="Event severity (low, medium, high, critical)")
+class PasskeyRegistrationResponse(BaseModel):
+    """Passkey registration response schema"""
+    challenge: str = Field(..., description="Base64 encoded challenge")
+    rp: Dict[str, Any] = Field(..., description="Relying party information")
+    user: Dict[str, Any] = Field(..., description="User information")
+    pub_key_cred_params: List[Dict[str, Any]] = Field(..., description="Public key credential parameters")
+    authenticator_selection: Dict[str, Any] = Field(..., description="Authenticator selection criteria")
+    timeout: int = Field(60000, description="Timeout in milliseconds")
+    attestation: str = Field("direct", description="Attestation preference")
 
 
-# Update forward references
-TokenResponse.model_rebuild()
+class PasskeyCredential(BaseModel):
+    """Passkey credential schema"""
+    id: str = Field(..., description="Credential ID")
+    raw_id: str = Field(..., description="Raw credential ID")
+    type: str = Field("public-key", description="Credential type")
+    response: Dict[str, Any] = Field(..., description="Authenticator response")
+
+
+class PasskeyRegistrationConfirm(BaseModel):
+    """Passkey registration confirmation schema"""
+    credential: PasskeyCredential = Field(..., description="Passkey credential")
+    challenge: str = Field(..., description="Original challenge")
+
+
+class PasskeyAuthenticationRequest(BaseModel):
+    """Passkey authentication request schema"""
+    email: EmailStr = Field(..., description="User email")
+
+
+class PasskeyAuthenticationChallenge(BaseModel):
+    """Passkey authentication challenge schema"""
+    challenge: str = Field(..., description="Base64 encoded challenge")
+    allow_credentials: List[Dict[str, Any]] = Field(..., description="Allowed credentials")
+    timeout: int = Field(60000, description="Timeout in milliseconds")
+    user_verification: str = Field("preferred", description="User verification requirement")
+
+
+class PasskeyAuthenticationConfirm(BaseModel):
+    """Passkey authentication confirmation schema"""
+    credential: PasskeyCredential = Field(..., description="Passkey credential")
+    challenge: str = Field(..., description="Original challenge")
+
+
+class UserStats(BaseModel):
+    """User statistics schema"""
+    total_courses_enrolled: int = Field(0, description="Total courses enrolled")
+    completed_courses: int = Field(0, description="Completed courses")
+    total_study_time: int = Field(0, description="Total study time in minutes")
+    average_score: float = Field(0.0, description="Average quiz/test score")
+    certificates_earned: int = Field(0, description="Number of certificates earned")
+    achievements_unlocked: int = Field(0, description="Number of achievements unlocked")
+
+
+class InstructorStats(BaseModel):
+    """Instructor statistics schema"""
+    total_courses: int = Field(0, description="Total courses created")
+    total_students: int = Field(0, description="Total enrolled students")
+    average_rating: float = Field(0.0, description="Average course rating")
+    total_revenue: float = Field(0.0, description="Total revenue earned")
+    published_courses: int = Field(0, description="Number of published courses")
+    draft_courses: int = Field(0, description="Number of draft courses")
+
+
+# Aliases for backward compatibility
+UserLogin = LoginRequest
+UserRegister = UserCreate
+PasswordReset = PasswordResetRequest
+SocialLogin = SocialLoginRequest

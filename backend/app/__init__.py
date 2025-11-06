@@ -32,7 +32,7 @@ from .models import (
 from .schemas import (
     UserCreate,
     UserLogin,
-    Token,
+    TokenResponse,
     UserResponse,
     CourseCreate,
     CourseResponse
@@ -78,7 +78,7 @@ __all__ = [
     # Schemas
     "UserCreate",
     "UserLogin",
-    "Token",
+    "TokenResponse",
     "UserResponse",
     "CourseCreate",
     "CourseResponse",

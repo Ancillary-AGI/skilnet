@@ -1,5 +1,19 @@
 """
 User model for EduVerse platform
+
+This module defines the User SQLAlchemy model which represents user accounts
+in the EduVerse e-learning platform. It includes comprehensive user profile
+information, authentication data, social login integrations, and modern
+security features like passkey/WebAuthn support.
+
+Features:
+- User authentication (password + passkey)
+- Social login integration (Google, Apple, Facebook)
+- Profile management with customizable preferences
+- Gamification system with XP and levels
+- Accessibility settings
+- Payment integration fields
+- Comprehensive audit trail with timestamps
 """
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, JSON, Float
@@ -11,33 +25,110 @@ from typing import Optional, Dict, Any
 import uuid
 
 class User(Base):
+    """
+    User model representing a user account in the EduVerse platform.
+
+    This model stores all user-related information including authentication
+    credentials, profile data, learning preferences, and platform-specific
+    metadata. It supports multiple authentication methods and integrates
+    with various social login providers.
+
+    Attributes:
+        Core Identity:
+            id: Unique UUID identifier for the user
+            email: Primary email address (unique, indexed)
+            username: Optional display username (unique, indexed)
+            full_name: User's complete name
+
+        Authentication:
+            hashed_password: Bcrypt-hashed password for traditional auth
+            google_id: Google OAuth identifier
+            apple_id: Apple Sign-In identifier
+            facebook_id: Facebook OAuth identifier
+            passkey_credential_id: WebAuthn credential ID
+            passkey_public_key: WebAuthn public key (JSON)
+            passkey_sign_count: WebAuthn signature counter
+            passkey_enabled: Whether passkey auth is active
+
+        Profile Information:
+            avatar_url: Profile picture URL
+            bio: User biography/description
+            date_of_birth: User's birth date
+            country_code: ISO 2-letter country code
+            timezone: User's timezone (IANA format)
+            language_preference: Preferred language code
+
+        Account Status:
+            is_active: Whether account is active (can login)
+            is_verified: Whether email is verified
+            is_premium: Whether user has premium subscription
+            is_instructor: Whether user can create courses
+            is_admin: Whether user has admin privileges
+
+        Learning Preferences:
+            learning_style: Preferred learning style (visual/auditory/kinesthetic)
+            difficulty_preference: Preferred difficulty level
+            daily_goal_minutes: Daily learning goal in minutes
+
+        Gamification:
+            total_xp: Total experience points earned
+            current_level: Current user level
+            current_streak: Current consecutive learning days
+            longest_streak: Longest learning streak achieved
+
+        Accessibility:
+            accessibility_settings: JSON object with accessibility preferences
+
+        Payment Integration:
+            stripe_customer_id: Stripe customer identifier
+            paypal_customer_id: PayPal customer identifier
+
+        Audit Trail:
+            created_at: Account creation timestamp
+            updated_at: Last profile update timestamp
+            last_login_at: Last successful login timestamp
+            email_verified_at: Email verification timestamp
+
+    Relationships:
+        courses: Courses created by this instructor
+        enrollments: Course enrollments for this user
+        subscriptions: Subscription records for this user
+    """
+
     __tablename__ = "users"
 
+    # Core Identity Fields
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     email = Column(String, unique=True, index=True, nullable=False)
     username = Column(String, unique=True, index=True, nullable=True)
     full_name = Column(String, nullable=True)
     hashed_password = Column(String, nullable=True)
-    
-    # Profile information
+
+    # Profile Information
     avatar_url = Column(String, nullable=True)
     bio = Column(Text, nullable=True)
     date_of_birth = Column(DateTime, nullable=True)
     country_code = Column(String(2), nullable=True)
     timezone = Column(String, nullable=True)
     language_preference = Column(String, default="en")
-    
-    # Account status
+
+    # Account Status
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
     is_premium = Column(Boolean, default=False)
     is_instructor = Column(Boolean, default=False)
     is_admin = Column(Boolean, default=False)
-    
-    # Social login
+
+    # Social Login Integration
     google_id = Column(String, nullable=True)
     apple_id = Column(String, nullable=True)
     facebook_id = Column(String, nullable=True)
+
+    # Passkey/WebAuthn Authentication
+    passkey_credential_id = Column(String, nullable=True)
+    passkey_public_key = Column(Text, nullable=True)
+    passkey_sign_count = Column(Integer, default=0)
+    passkey_enabled = Column(Boolean, default=False)
     
     # Learning preferences
     learning_style = Column(String, nullable=True)  # visual, auditory, kinesthetic
@@ -64,9 +155,9 @@ class User(Base):
     email_verified_at = Column(DateTime, nullable=True)
     
     # Relationships
-    # courses = relationship("Course", back_populates="instructor")
-    # enrollments = relationship("Enrollment", back_populates="user")
-    # subscriptions = relationship("Subscription", back_populates="user")
+    courses = relationship("Course", back_populates="instructor")
+    enrollments = relationship("Enrollment", back_populates="user")
+    subscriptions = relationship("Subscription", back_populates="user")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, full_name={self.full_name})>"

@@ -44,7 +44,8 @@ class Subscription(Base):
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     user_id = Column(String, ForeignKey("users.id"), nullable=False)
-    
+    user = relationship("User", back_populates="subscriptions")
+
     # Subscription details
     tier = Column(Enum(SubscriptionTier), nullable=False)
     billing_cycle = Column(Enum(BillingCycle), nullable=False)
@@ -110,7 +111,7 @@ class Payment(Base):
     
     # Description and metadata
     description = Column(Text)
-    metadata = Column(JSON)
+    payment_metadata = Column(JSON)
     
     # Failure information
     failure_reason = Column(String)

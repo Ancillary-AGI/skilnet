@@ -27,10 +27,15 @@ class Course(Base):
     
     # Instructor
     instructor_id = Column(String, ForeignKey("users.id"))
-    
+    instructor = relationship("User", back_populates="courses")
+
     # Category
     category_id = Column(String, ForeignKey("categories.id"))
-    
+    category = relationship("Category", back_populates="courses")
+
+    # Relationships
+    enrollments = relationship("Enrollment", back_populates="course")
+
     # Pricing
     price = Column(Float, default=0.0)
     currency = Column(String, default="USD")

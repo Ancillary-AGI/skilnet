@@ -8,6 +8,13 @@ class AppTheme {
   static const Color warningColor = Color(0xFFF39C12);
   static const Color successColor = Color(0xFF27AE60);
 
+  // Additional colors for UI
+  static const Color textColor = Color(0xFF1A1A1A);
+  static const Color textSecondaryColor = Color(0xFF6B7280);
+  static const Color surfaceColor = Color(0xFFF9FAFB);
+  static const Color dividerColor = Color(0xFFE5E7EB);
+  static const Color backgroundColor = Color(0xFFFFFFFF);
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,

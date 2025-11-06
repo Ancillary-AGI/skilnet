@@ -1,49 +1,38 @@
-# Multi-stage Docker build for Flutter web
-FROM cirrusci/flutter:stable as build
+# Multi-stage build for Flutter web application
+
+# Stage 1: Build the Flutter web application
+FROM cirrusci/flutter:stable AS build
 
 # Set working directory
 WORKDIR /app
 
 # Copy pubspec files
-COPY pubspec.yaml pubspec.lock ./
+COPY pubspec.* ./
 
 # Get dependencies
 RUN flutter pub get
 
-# Copy source code
+# Copy the rest of the application
 COPY . .
 
-# Build web app
-RUN flutter build web --release --web-renderer html
+# Build the web application
+RUN flutter build web --release --web-renderer canvaskit
 
-# Production stage with Nginx
-FROM nginx:alpine as production
+# Stage 2: Serve the application with Nginx
+FROM nginx:alpine
 
-# Copy built web app
+# Copy built application from build stage
 COPY --from=build /app/build/web /usr/share/nginx/html
 
-# Copy nginx configuration
+# Copy custom nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
 
-# Create nginx user
-RUN addgroup -g 1001 -S nginx && \
-    adduser -S -D -H -u 1001 -h /var/cache/nginx -s /sbin/nologin -G nginx -g nginx nginx
-
-# Set permissions
-RUN chown -R nginx:nginx /usr/share/nginx/html && \
-    chown -R nginx:nginx /var/cache/nginx && \
-    chown -R nginx:nginx /var/log/nginx && \
-    chown -R nginx:nginx /etc/nginx/conf.d
-
-# Switch to non-root user
-USER nginx
-
-# Expose port
+# Expose port 80
 EXPOSE 80
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost/health || exit 1
 
 # Start nginx
 CMD ["nginx", "-g", "daemon off;"]

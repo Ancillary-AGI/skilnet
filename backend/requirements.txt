@@ -15,7 +15,7 @@ PyMySQL==1.1.1
 
 # Database - MongoDB (optional)
 motor==3.6.0
-pymongo==4.10.1
+pymongo>=4.9,<4.10
 
 # Database - SQLite (development)
 aiosqlite==0.20.0

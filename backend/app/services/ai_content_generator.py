@@ -1,1088 +1,379 @@
 """
-Advanced AI content generation service for automatic lesson creation
+AI Content Generator Service for EduVerse
+
+Provides AI-powered content generation using OpenAI GPT models
 """
 
-import asyncio
-import logging
-from typing import Dict, Any, List, Optional, Tuple
-import openai
-import anthropic
-from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM, AutoModelForQuestionAnswering
-import torch
 import json
+import asyncio
+from typing import List, Dict, Any, Optional
 from datetime import datetime
-import aiofiles
-import base64
-from PIL import Image, ImageDraw, ImageFont
-import io
-import requests
-from dataclasses import dataclass
-import numpy as np
-import os
-from pathlib import Path
-import tempfile
-import subprocess
-from concurrent.futures import ThreadPoolExecutor
-import hashlib
-import time
-from functools import lru_cache
-import tiktoken
+import openai
+from pydantic import BaseModel
 
-logger = logging.getLogger(__name__)
+from app.core.config import settings
+from app.core.logging import get_logger, log_performance
 
 
-@dataclass
-class ContentGenerationRequest:
-    subject: str
-    topic: str
-    difficulty_level: str  # beginner, intermediate, advanced, expert
-    duration_minutes: int
+class QuizQuestion(BaseModel):
+    """Quiz question model"""
+    question: str
+    options: List[str]
+    correct_answer: int
+    explanation: str
+    difficulty: str
+
+
+class CourseContent(BaseModel):
+    """Generated course content model"""
+    title: str
+    description: str
     learning_objectives: List[str]
+    content_outline: List[Dict[str, Any]]
+    prerequisites: List[str]
     target_audience: str
-    content_types: List[str]  # video, text, quiz, interactive, vr, ar
-    language: str = "en"
-    accessibility_requirements: List[str] = None
-    prior_knowledge: List[str] = None
+    estimated_duration: int
 
 
-@dataclass
-class GeneratedContent:
-    lesson_plan: Dict[str, Any]
-    video_script: str
-    presentation_slides: List[Dict[str, Any]]
-    quiz_questions: List[Dict[str, Any]]
-    interactive_exercises: List[Dict[str, Any]]
-    vr_scenarios: List[Dict[str, Any]]
-    ar_objects: List[Dict[str, Any]]
-    accessibility_features: Dict[str, Any]
-    assessment_rubric: Dict[str, Any]
-    additional_resources: List[Dict[str, Any]]
+class PersonalizedRecommendation(BaseModel):
+    """Personalized learning recommendation"""
+    course_id: str
+    reason: str
+    confidence_score: float
+    learning_path: List[str]
 
 
 class AIContentGenerator:
-    """Advanced AI-powered content generation system - Superior to competitors"""
+    """AI-powered content generation service"""
 
     def __init__(self):
-        self.openai_client = openai.AsyncOpenAI()
-        self.anthropic_client = anthropic.AsyncAnthropic()
-        self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.models = {}
-        self.content_cache = {}
-        self.tokenizer = None
-        self.executor = ThreadPoolExecutor(max_workers=4)
-        self.cache_dir = Path(tempfile.gettempdir()) / "eduverse_ai_cache"
-        self.cache_dir.mkdir(exist_ok=True)
+        self.logger = get_logger("ai_content_generator")
+        if settings.OPENAI_API_KEY:
+            openai.api_key = settings.OPENAI_API_KEY
+        else:
+            self.logger.warning("OpenAI API key not configured")
 
-        # Performance tracking
-        self.generation_stats = {
-            "total_generations": 0,
-            "cache_hits": 0,
-            "average_generation_time": 0,
-            "success_rate": 0
-        }
-        
-    async def initialize_models(self):
-        """Initialize AI models for content generation"""
-        try:
-            logger.info("Initializing AI content generation models...")
-            
-            # Load specialized models
-            self.models['text_generator'] = pipeline(
-                "text-generation",
-                model="microsoft/DialoGPT-large",
-                device=0 if self.device == "cuda" else -1
-            )
-            
-            self.models['question_generator'] = pipeline(
-                "text2text-generation",
-                model="valhalla/t5-base-qg-hl",
-                device=0 if self.device == "cuda" else -1
-            )
-            
-            # Image generation for visual content
-            self.models['image_generator'] = pipeline(
-                "text-to-image",
-                model="runwayml/stable-diffusion-v1-5",
-                device=0 if self.device == "cuda" else -1
-            )
-            
-            logger.info("AI models initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize AI models: {e}")
-            await self._initialize_mock_models()
-    
-    async def generate_complete_lesson(
+    @log_performance
+    async def generate_course_content(
         self,
-        request: ContentGenerationRequest
-    ) -> GeneratedContent:
-        """Generate a complete lesson with all components - Superior to competitors"""
-
-        start_time = time.time()
-        cache_key = self._generate_cache_key(request)
-
-        logger.info(f"🚀 Generating superior lesson for {request.subject}: {request.topic}")
-
-        # Check cache first for performance
-        cached_content = await self._get_cached_content(cache_key)
-        if cached_content:
-            self.generation_stats["cache_hits"] += 1
-            logger.info(f"⚡ Cache hit for {request.topic}")
-            return cached_content
-
+        topic: str,
+        difficulty: str = "intermediate",
+        target_audience: str = "professionals",
+        duration_hours: int = 10
+    ) -> CourseContent:
+        """Generate comprehensive course content using AI"""
         try:
-            # Generate lesson plan structure with enhanced prompts
-            lesson_plan = await self._generate_lesson_plan(request)
+            prompt = f"""
+            Generate a comprehensive course outline for: {topic}
 
-            # Generate content components in parallel with error handling
-            tasks = [
-                self._generate_video_script(request, lesson_plan),
-                self._generate_presentation_slides(request, lesson_plan),
-                self._generate_quiz_questions(request, lesson_plan),
-                self._generate_interactive_exercises(request, lesson_plan),
-                self._generate_vr_scenarios(request, lesson_plan),
-                self._generate_ar_objects(request, lesson_plan),
-                self._generate_accessibility_features(request),
-                self._generate_assessment_rubric(request, lesson_plan),
-                self._generate_additional_resources(request, lesson_plan)
+            Requirements:
+            - Difficulty level: {difficulty}
+            - Target audience: {target_audience}
+            - Estimated duration: {duration_hours} hours
+
+            Please provide a JSON response with the following structure:
+            {{
+                "title": "Course Title",
+                "description": "Detailed course description (200-300 words)",
+                "learning_objectives": ["Objective 1", "Objective 2", "Objective 3", ...],
+                "content_outline": [
+                    {{
+                        "module": "Module Title",
+                        "topics": ["Topic 1", "Topic 2", "Topic 3"],
+                        "duration_hours": 2,
+                        "description": "Module description"
+                    }}
+                ],
+                "prerequisites": ["Prerequisite 1", "Prerequisite 2"],
+                "target_audience": "Detailed audience description",
+                "estimated_duration": {duration_hours}
+            }}
+            """
+
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are an expert course designer and educator. Generate high-quality, engaging course content."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=2000,
+                temperature=0.7
+            )
+
+            content_json = response.choices[0].message.content.strip()
+            content_data = json.loads(content_json)
+
+            return CourseContent(**content_data)
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate course content: {e}")
+            # Return fallback content
+            return CourseContent(
+                title=f"Introduction to {topic}",
+                description=f"A comprehensive course on {topic} designed for {target_audience}.",
+                learning_objectives=[
+                    f"Understand the fundamentals of {topic}",
+                    f"Apply {topic} concepts in practical scenarios",
+                    f"Master advanced techniques in {topic}"
+                ],
+                content_outline=[
+                    {
+                        "module": f"Basics of {topic}",
+                        "topics": [f"Introduction to {topic}", "Key Concepts", "Foundations"],
+                        "duration_hours": duration_hours // 3,
+                        "description": f"Fundamental concepts and principles of {topic}"
+                    }
+                ],
+                prerequisites=["Basic computer skills"],
+                target_audience=target_audience,
+                estimated_duration=duration_hours
+            )
+
+    @log_performance
+    async def generate_quiz_questions(
+        self,
+        topic: str,
+        difficulty: str = "intermediate",
+        num_questions: int = 10
+    ) -> List[QuizQuestion]:
+        """Generate quiz questions for a topic"""
+        try:
+            prompt = f"""
+            Generate {num_questions} multiple-choice quiz questions for: {topic}
+
+            Requirements:
+            - Difficulty: {difficulty}
+            - Each question must have 4 options (A, B, C, D)
+            - Only one correct answer per question
+            - Include detailed explanation for each answer
+            - Questions should test understanding and application
+
+            Return as JSON array with this structure:
+            [
+                {{
+                    "question": "Question text here?",
+                    "options": ["Option A", "Option B", "Option C", "Option D"],
+                    "correct_answer": 0,
+                    "explanation": "Detailed explanation why this is correct",
+                    "difficulty": "{difficulty}"
+                }}
+            ]
+            """
+
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an expert educator creating high-quality assessment questions."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=3000,
+                temperature=0.6
+            )
+
+            questions_json = response.choices[0].message.content.strip()
+            questions_data = json.loads(questions_json)
+
+            return [QuizQuestion(**q) for q in questions_data]
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate quiz questions: {e}")
+            # Return sample questions
+            return [
+                QuizQuestion(
+                    question=f"What is the most important concept in {topic}?",
+                    options=["Option A", "Option B", "Option C", "Option D"],
+                    correct_answer=0,
+                    explanation=f"This is the fundamental concept in {topic}",
+                    difficulty=difficulty
+                )
             ]
 
-            results = await asyncio.gather(*tasks, return_exceptions=True)
-
-            # Handle any exceptions in results
-            for i, result in enumerate(results):
-                if isinstance(result, Exception):
-                    logger.error(f"Task {i} failed: {result}")
-                    results[i] = await self._get_fallback_content(i)
-
-            content = GeneratedContent(
-                lesson_plan=lesson_plan,
-                video_script=results[0],
-                presentation_slides=results[1],
-                quiz_questions=results[2],
-                interactive_exercises=results[3],
-                vr_scenarios=results[4],
-                ar_objects=results[5],
-                accessibility_features=results[6],
-                assessment_rubric=results[7],
-                additional_resources=results[8]
-            )
-
-            # Cache the generated content for future use
-            await self._cache_content(cache_key, content)
-
-            # Update performance statistics
-            generation_time = time.time() - start_time
-            self.generation_stats["total_generations"] += 1
-            self.generation_stats["average_generation_time"] = (
-                (self.generation_stats["average_generation_time"] * (self.generation_stats["total_generations"] - 1) + generation_time)
-                / self.generation_stats["total_generations"]
-            )
-            self.generation_stats["success_rate"] = (self.generation_stats["total_generations"] - len([r for r in results if isinstance(r, Exception)])) / self.generation_stats["total_generations"]
-
-            logger.info(f"✅ Generated superior lesson in {generation_time:.2f}s")
-            return content
-
-        except Exception as e:
-            logger.error(f"❌ Failed to generate lesson: {e}")
-            return await self._generate_fallback_content_complete(request)
-    
-    async def _generate_lesson_plan(self, request: ContentGenerationRequest) -> Dict[str, Any]:
-        """Generate comprehensive lesson plan"""
-        
-        prompt = f"""
-        Create a detailed lesson plan for:
-        Subject: {request.subject}
-        Topic: {request.topic}
-        Difficulty: {request.difficulty_level}
-        Duration: {request.duration_minutes} minutes
-        Target Audience: {request.target_audience}
-        Learning Objectives: {', '.join(request.learning_objectives)}
-        
-        Include:
-        1. Introduction (hook, objectives, prerequisites)
-        2. Main content sections with timing
-        3. Interactive activities
-        4. Assessment methods
-        5. Conclusion and next steps
-        6. Differentiation strategies
-        7. Technology integration points
-        8. Accessibility considerations
-        """
-        
-        try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "You are an expert educational content creator and instructional designer."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7,
-                max_tokens=2000
-            )
-            
-            lesson_plan_text = response.choices[0].message.content
-            
-            # Structure the lesson plan
-            return {
-                "title": f"{request.topic} - {request.difficulty_level.title()} Level",
-                "subject": request.subject,
-                "duration_minutes": request.duration_minutes,
-                "difficulty_level": request.difficulty_level,
-                "learning_objectives": request.learning_objectives,
-                "content": lesson_plan_text,
-                "sections": await self._parse_lesson_sections(lesson_plan_text),
-                "estimated_completion_time": request.duration_minutes,
-                "prerequisites": request.prior_knowledge or [],
-                "generated_at": datetime.utcnow().isoformat()
-            }
-            
-        except Exception as e:
-            logger.error(f"Error generating lesson plan: {e}")
-            return await self._generate_fallback_lesson_plan(request)
-    
-    async def _generate_video_script(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
+    @log_performance
+    async def generate_course_summary(
+        self,
+        course_content: str,
+        max_length: int = 200
     ) -> str:
-        """Generate engaging video script"""
-        
-        prompt = f"""
-        Create an engaging video script for a {request.duration_minutes}-minute educational video on:
-        Topic: {request.topic}
-        Subject: {request.subject}
-        Difficulty: {request.difficulty_level}
-        Target Audience: {request.target_audience}
-        
-        Based on this lesson plan: {lesson_plan['content'][:500]}...
-        
-        The script should include:
-        1. Compelling hook (first 30 seconds)
-        2. Clear learning objectives
-        3. Main content with examples and analogies
-        4. Interactive moments for engagement
-        5. Visual cues for graphics/animations
-        6. Smooth transitions between sections
-        7. Strong conclusion with call-to-action
-        8. Accessibility notes (captions, descriptions)
-        
-        Format: [SCENE] [VISUAL] [AUDIO] [TIMING]
-        """
-        
+        """Generate a concise course summary"""
         try:
-            response = await self.anthropic_client.messages.create(
-                model="claude-3-opus-20240229",
-                max_tokens=3000,
+            prompt = f"""
+            Create a compelling course summary (maximum {max_length} characters) for the following content:
+
+            {course_content}
+
+            The summary should:
+            - Be engaging and informative
+            - Highlight key learning outcomes
+            - Include the target audience
+            - Be suitable for course catalog display
+            """
+
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-3.5-turbo",
                 messages=[
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            
-            return response.content[0].text
-            
-        except Exception as e:
-            logger.error(f"Error generating video script: {e}")
-            return await self._generate_fallback_video_script(request)
-    
-    async def _generate_presentation_slides(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate presentation slides with visual elements"""
-        
-        prompt = f"""
-        Create presentation slides for:
-        Topic: {request.topic}
-        Subject: {request.subject}
-        Duration: {request.duration_minutes} minutes
-        
-        Generate 8-12 slides with:
-        1. Title slide
-        2. Learning objectives
-        3. Main content slides (with visuals)
-        4. Interactive slides
-        5. Summary slide
-        6. Next steps slide
-        
-        For each slide, provide:
-        - Title
-        - Main content points
-        - Visual suggestions
-        - Speaker notes
-        - Accessibility descriptions
-        """
-        
-        try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4-turbo-preview",
-                messages=[
-                    {"role": "system", "content": "You are an expert presentation designer and educator."},
+                    {"role": "system", "content": "You are a marketing copywriter specializing in educational content."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.6,
-                max_tokens=2500
+                max_tokens=300,
+                temperature=0.7
             )
-            
-            slides_text = response.choices[0].message.content
-            slides = await self._parse_slides_content(slides_text, request)
-            
-            # Generate visual elements for each slide
-            for slide in slides:
-                if slide.get('visual_suggestions'):
-                    slide['generated_visuals'] = await self._generate_slide_visuals(
-                        slide['visual_suggestions'], 
-                        request.topic
-                    )
-            
-            return slides
-            
+
+            return response.choices[0].message.content.strip()
+
         except Exception as e:
-            logger.error(f"Error generating slides: {e}")
-            return await self._generate_fallback_slides(request)
-    
-    async def _generate_quiz_questions(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate diverse quiz questions"""
-        
-        content_summary = lesson_plan.get('content', '')[:1000]
-        
-        # Generate different types of questions
-        question_types = [
-            "multiple_choice",
-            "true_false", 
-            "short_answer",
-            "essay",
-            "matching",
-            "fill_in_blank",
-            "drag_drop",
-            "interactive_scenario"
-        ]
-        
-        questions = []
-        
-        for q_type in question_types[:6]:  # Generate 6 different types
-            try:
-                prompt = f"""
-                Create a {q_type} question for:
-                Topic: {request.topic}
-                Subject: {request.subject}
-                Difficulty: {request.difficulty_level}
-                Content: {content_summary}
-                
-                Requirements:
-                - Align with learning objectives
-                - Appropriate difficulty level
-                - Clear and unambiguous
-                - Include explanation for correct answer
-                - Consider accessibility needs
-                """
-                
-                response = await self.openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are an expert assessment designer."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.5,
-                    max_tokens=800
-                )
-                
-                question_data = await self._parse_question_response(
-                    response.choices[0].message.content, 
-                    q_type
-                )
-                questions.append(question_data)
-                
-            except Exception as e:
-                logger.error(f"Error generating {q_type} question: {e}")
-        
-        return questions
-    
-    async def _generate_interactive_exercises(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate interactive learning exercises"""
-        
-        exercises = []
-        
-        # Different types of interactive exercises
-        exercise_types = [
-            "simulation",
-            "virtual_lab",
-            "case_study",
-            "problem_solving",
-            "collaborative_project",
-            "gamified_challenge",
-            "role_playing",
-            "decision_tree"
-        ]
-        
-        for exercise_type in exercise_types[:4]:  # Generate 4 exercises
-            try:
-                prompt = f"""
-                Design an interactive {exercise_type} exercise for:
-                Topic: {request.topic}
-                Subject: {request.subject}
-                Difficulty: {request.difficulty_level}
-                Duration: 10-15 minutes
-                
-                Include:
-                - Clear instructions
-                - Learning objectives
-                - Step-by-step process
-                - Success criteria
-                - Feedback mechanisms
-                - Accessibility adaptations
-                - Technology requirements
-                """
-                
-                response = await self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",
-                    messages=[
-                        {"role": "system", "content": "You are an expert in interactive learning design."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.7,
-                    max_tokens=1200
-                )
-                
-                exercise = {
-                    "type": exercise_type,
-                    "title": f"{request.topic} - {exercise_type.replace('_', ' ').title()}",
-                    "description": response.choices[0].message.content,
-                    "duration_minutes": 15,
-                    "difficulty": request.difficulty_level,
-                    "technology_required": await self._determine_tech_requirements(exercise_type),
-                    "accessibility_features": await self._generate_exercise_accessibility(exercise_type),
-                    "generated_at": datetime.utcnow().isoformat()
-                }
-                
-                exercises.append(exercise)
-                
-            except Exception as e:
-                logger.error(f"Error generating {exercise_type} exercise: {e}")
-        
-        return exercises
-    
-    async def _generate_vr_scenarios(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate VR learning scenarios"""
-        
-        if "vr" not in request.content_types:
-            return []
-        
-        scenarios = []
-        
-        # VR scenario types based on subject
-        vr_types = await self._get_vr_types_for_subject(request.subject)
-        
-        for vr_type in vr_types[:3]:  # Generate 3 VR scenarios
-            try:
-                prompt = f"""
-                Design a VR learning scenario for:
-                Topic: {request.topic}
-                Subject: {request.subject}
-                Type: {vr_type}
-                Difficulty: {request.difficulty_level}
-                
-                Include:
-                - 3D environment description
-                - Interactive objects and their behaviors
-                - User interactions and gestures
-                - Learning objectives within VR
-                - Progress tracking mechanisms
-                - Safety considerations
-                - Accessibility adaptations for VR
-                - Hardware requirements
-                """
-                
-                response = await self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",
-                    messages=[
-                        {"role": "system", "content": "You are an expert VR educational experience designer."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.8,
-                    max_tokens=1500
-                )
-                
-                scenario = {
-                    "type": vr_type,
-                    "title": f"VR {request.topic} - {vr_type.replace('_', ' ').title()}",
-                    "description": response.choices[0].message.content,
-                    "environment": await self._generate_vr_environment_spec(vr_type, request.topic),
-                    "interactions": await self._generate_vr_interactions(vr_type, request.topic),
-                    "learning_objectives": request.learning_objectives,
-                    "duration_minutes": 20,
-                    "hardware_requirements": await self._get_vr_hardware_requirements(),
-                    "accessibility_features": await self._generate_vr_accessibility(),
-                    "generated_at": datetime.utcnow().isoformat()
-                }
-                
-                scenarios.append(scenario)
-                
-            except Exception as e:
-                logger.error(f"Error generating VR scenario {vr_type}: {e}")
-        
-        return scenarios
-    
-    async def _generate_ar_objects(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate AR objects and experiences"""
-        
-        if "ar" not in request.content_types:
-            return []
-        
-        ar_objects = []
-        
-        # AR object types based on subject
-        ar_types = await self._get_ar_types_for_subject(request.subject)
-        
-        for ar_type in ar_types[:4]:  # Generate 4 AR objects
-            try:
-                prompt = f"""
-                Design an AR learning object for:
-                Topic: {request.topic}
-                Subject: {request.subject}
-                Type: {ar_type}
-                Difficulty: {request.difficulty_level}
-                
-                Include:
-                - 3D model specifications
-                - Interactive features
-                - Animations and behaviors
-                - Tracking requirements
-                - User interaction methods
-                - Educational content integration
-                - Accessibility considerations
-                - Technical specifications
-                """
-                
-                response = await self.openai_client.chat.completions.create(
-                    model="gpt-4-turbo-preview",
-                    messages=[
-                        {"role": "system", "content": "You are an expert AR educational content designer."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.7,
-                    max_tokens=1200
-                )
-                
-                ar_object = {
-                    "type": ar_type,
-                    "title": f"AR {request.topic} - {ar_type.replace('_', ' ').title()}",
-                    "description": response.choices[0].message.content,
-                    "model_specifications": await self._generate_ar_model_specs(ar_type, request.topic),
-                    "interactions": await self._generate_ar_interactions(ar_type),
-                    "tracking_requirements": await self._get_ar_tracking_requirements(ar_type),
-                    "learning_integration": request.learning_objectives,
-                    "accessibility_features": await self._generate_ar_accessibility(),
-                    "generated_at": datetime.utcnow().isoformat()
-                }
-                
-                ar_objects.append(ar_object)
-                
-            except Exception as e:
-                logger.error(f"Error generating AR object {ar_type}: {e}")
-        
-        return ar_objects
-    
-    async def _generate_accessibility_features(
-        self, 
-        request: ContentGenerationRequest
-    ) -> Dict[str, Any]:
-        """Generate comprehensive accessibility features"""
-        
-        accessibility_features = {
-            "visual_impairments": {
-                "screen_reader_support": True,
-                "high_contrast_mode": True,
-                "font_size_adjustment": True,
-                "color_blind_friendly": True,
-                "audio_descriptions": True,
-                "braille_support": True if "braille" in (request.accessibility_requirements or []) else False
-            },
-            "hearing_impairments": {
-                "closed_captions": True,
-                "sign_language_interpretation": True,
-                "visual_alerts": True,
-                "transcript_availability": True,
-                "haptic_feedback": True
-            },
-            "motor_impairments": {
-                "keyboard_navigation": True,
-                "voice_control": True,
-                "eye_tracking_support": True,
-                "switch_control": True,
-                "gesture_alternatives": True
-            },
-            "cognitive_disabilities": {
-                "simplified_interface": True,
-                "progress_indicators": True,
-                "consistent_navigation": True,
-                "clear_instructions": True,
-                "memory_aids": True,
-                "attention_management": True
-            },
-            "language_support": {
-                "multiple_languages": True,
-                "translation_support": True,
-                "simplified_language_option": True,
-                "pronunciation_guides": True,
-                "cultural_adaptations": True
-            },
-            "technology_adaptations": {
-                "low_bandwidth_mode": True,
-                "offline_capability": True,
-                "multiple_device_support": True,
-                "adaptive_quality": True,
-                "progressive_enhancement": True
-            }
-        }
-        
-        # Add specific features based on content type
-        if "vr" in request.content_types:
-            accessibility_features["vr_specific"] = {
-                "comfort_settings": True,
-                "motion_sickness_reduction": True,
-                "seated_experience_option": True,
-                "audio_spatial_cues": True,
-                "haptic_navigation": True
-            }
-        
-        if "ar" in request.content_types:
-            accessibility_features["ar_specific"] = {
-                "marker_alternatives": True,
-                "voice_object_identification": True,
-                "simplified_ar_mode": True,
-                "contrast_enhancement": True
-            }
-        
-        return accessibility_features
-    
-    async def _generate_assessment_rubric(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> Dict[str, Any]:
-        """Generate comprehensive assessment rubric"""
-        
-        prompt = f"""
-        Create a detailed assessment rubric for:
-        Topic: {request.topic}
-        Subject: {request.subject}
-        Difficulty: {request.difficulty_level}
-        Learning Objectives: {', '.join(request.learning_objectives)}
-        
-        Include:
-        - Performance criteria for each learning objective
-        - 4-point scale (Excellent, Good, Satisfactory, Needs Improvement)
-        - Specific descriptors for each level
-        - Weighting for different criteria
-        - Formative and summative assessment components
-        - Self-assessment opportunities
-        - Peer assessment guidelines
-        - Accessibility considerations
-        """
-        
+            self.logger.error(f"Failed to generate course summary: {e}")
+            return f"Comprehensive course on {course_content[:50]}..."
+
+    @log_performance
+    async def personalize_learning_path(
+        self,
+        user_profile: Dict[str, Any],
+        completed_courses: List[str],
+        interests: List[str]
+    ) -> List[PersonalizedRecommendation]:
+        """Generate personalized course recommendations"""
         try:
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-4-turbo-preview",
+            prompt = f"""
+            Based on the following user profile, recommend the next best courses:
+
+            User Profile:
+            - Experience Level: {user_profile.get('experience_level', 'beginner')}
+            - Interests: {', '.join(interests)}
+            - Completed Courses: {', '.join(completed_courses)}
+            - Learning Goals: {user_profile.get('goals', 'General skill development')}
+
+            Provide 5 course recommendations in JSON format:
+            [
+                {{
+                    "course_id": "course_identifier",
+                    "reason": "Why this course is recommended",
+                    "confidence_score": 0.85,
+                    "learning_path": ["Step 1", "Step 2", "Step 3"]
+                }}
+            ]
+
+            Focus on logical progression and skill building.
+            """
+
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-4",
                 messages=[
-                    {"role": "system", "content": "You are an expert in educational assessment and rubric design."},
+                    {"role": "system", "content": "You are an expert learning path designer and career counselor."},
                     {"role": "user", "content": prompt}
                 ],
-                temperature=0.5,
-                max_tokens=2000
+                max_tokens=1500,
+                temperature=0.8
             )
-            
-            rubric_text = response.choices[0].message.content
-            
+
+            recommendations_json = response.choices[0].message.content.strip()
+            recommendations_data = json.loads(recommendations_json)
+
+            return [PersonalizedRecommendation(**r) for r in recommendations_data]
+
+        except Exception as e:
+            self.logger.error(f"Failed to generate personalized recommendations: {e}")
+            return []
+
+    @log_performance
+    async def analyze_learning_pattern(
+        self,
+        user_id: str,
+        learning_history: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Analyze user learning patterns and provide insights"""
+        try:
+            prompt = f"""
+            Analyze the following learning history and provide insights:
+
+            Learning History:
+            {json.dumps(learning_history, indent=2)}
+
+            Provide analysis in JSON format:
+            {{
+                "strengths": ["Strength 1", "Strength 2"],
+                "weaknesses": ["Weakness 1", "Weakness 2"],
+                "learning_style": "visual/auditory/kinesthetic/reading",
+                "recommended_study_time": "2 hours daily",
+                "suggested_improvements": ["Improvement 1", "Improvement 2"],
+                "next_skill_focus": "Recommended next skill to learn"
+            }}
+            """
+
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "You are a learning analytics expert analyzing student performance data."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=1000,
+                temperature=0.6
+            )
+
+            analysis_json = response.choices[0].message.content.strip()
+            return json.loads(analysis_json)
+
+        except Exception as e:
+            self.logger.error(f"Failed to analyze learning pattern: {e}")
             return {
-                "title": f"Assessment Rubric - {request.topic}",
-                "learning_objectives": request.learning_objectives,
-                "rubric_content": rubric_text,
-                "assessment_types": [
-                    "formative_assessment",
-                    "summative_assessment", 
-                    "self_assessment",
-                    "peer_assessment"
+                "strengths": ["Consistent learning"],
+                "weaknesses": ["Need more practice"],
+                "learning_style": "mixed",
+                "recommended_study_time": "1-2 hours daily",
+                "suggested_improvements": ["Practice regularly"],
+                "next_skill_focus": "Advanced topics"
+            }
+
+    @log_performance
+    async def generate_adaptive_content(
+        self,
+        topic: str,
+        user_performance: Dict[str, Any],
+        difficulty_adjustment: str
+    ) -> Dict[str, Any]:
+        """Generate adaptive content based on user performance"""
+        try:
+            prompt = f"""
+            Generate adaptive learning content based on user performance:
+
+            Topic: {topic}
+            User Performance: {json.dumps(user_performance)}
+            Difficulty Adjustment: {difficulty_adjustment}
+
+            Provide adaptive content in JSON format:
+            {{
+                "adjusted_difficulty": "intermediate",
+                "additional_resources": ["Resource 1", "Resource 2"],
+                "practice_exercises": ["Exercise 1", "Exercise 2"],
+                "remedial_content": "Additional explanation if needed",
+                "advanced_challenges": ["Challenge 1", "Challenge 2"],
+                "next_topic_suggestion": "Suggested next topic"
+            }}
+            """
+
+            response = await openai.ChatCompletion.acreate(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an adaptive learning specialist creating personalized content."},
+                    {"role": "user", "content": prompt}
                 ],
-                "grading_scale": {
-                    "excellent": {"points": 4, "percentage": "90-100%"},
-                    "good": {"points": 3, "percentage": "80-89%"},
-                    "satisfactory": {"points": 2, "percentage": "70-79%"},
-                    "needs_improvement": {"points": 1, "percentage": "Below 70%"}
-                },
-                "accessibility_adaptations": True,
-                "generated_at": datetime.utcnow().isoformat()
-            }
-            
+                max_tokens=1000,
+                temperature=0.7
+            )
+
+            content_json = response.choices[0].message.content.strip()
+            return json.loads(content_json)
+
         except Exception as e:
-            logger.error(f"Error generating assessment rubric: {e}")
-            return await self._generate_fallback_rubric(request)
-    
-    async def _generate_additional_resources(
-        self, 
-        request: ContentGenerationRequest, 
-        lesson_plan: Dict[str, Any]
-    ) -> List[Dict[str, Any]]:
-        """Generate additional learning resources"""
-        
-        resources = []
-        
-        resource_types = [
-            "reading_materials",
-            "video_resources", 
-            "interactive_websites",
-            "mobile_apps",
-            "research_papers",
-            "case_studies",
-            "practice_exercises",
-            "community_forums"
-        ]
-        
-        for resource_type in resource_types:
-            try:
-                prompt = f"""
-                Suggest {resource_type} for learning about:
-                Topic: {request.topic}
-                Subject: {request.subject}
-                Difficulty: {request.difficulty_level}
-                
-                Provide:
-                - 3-5 specific recommendations
-                - Brief description of each
-                - Why it's valuable for learning
-                - Accessibility considerations
-                - Cost information (free/paid)
-                """
-                
-                response = await self.openai_client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": "You are an expert educational resource curator."},
-                        {"role": "user", "content": prompt}
-                    ],
-                    temperature=0.6,
-                    max_tokens=800
-                )
-                
-                resource = {
-                    "type": resource_type,
-                    "title": f"{resource_type.replace('_', ' ').title()} for {request.topic}",
-                    "recommendations": response.choices[0].message.content,
-                    "accessibility_checked": True,
-                    "cost_range": "Free to $50",
-                    "generated_at": datetime.utcnow().isoformat()
-                }
-                
-                resources.append(resource)
-                
-            except Exception as e:
-                logger.error(f"Error generating {resource_type} resources: {e}")
-        
-        return resources
-    
-    # Helper methods for content generation
-    async def _parse_lesson_sections(self, lesson_text: str) -> List[Dict[str, Any]]:
-        """Parse lesson plan into structured sections"""
-        # Implementation for parsing lesson plan structure
-        sections = []
-        # Add parsing logic here
-        return sections
-    
-    async def _parse_slides_content(self, slides_text: str, request: ContentGenerationRequest) -> List[Dict[str, Any]]:
-        """Parse slides content into structured format"""
-        # Implementation for parsing slides
-        slides = []
-        # Add parsing logic here
-        return slides
-    
-    async def _generate_slide_visuals(self, visual_suggestions: str, topic: str) -> List[str]:
-        """Generate visual elements for slides"""
-        # Implementation for generating slide visuals
-        return []
-    
-    async def _parse_question_response(self, response_text: str, question_type: str) -> Dict[str, Any]:
-        """Parse AI response into structured question format"""
-        # Implementation for parsing question responses
-        return {}
-    
-    async def _get_vr_types_for_subject(self, subject: str) -> List[str]:
-        """Get appropriate VR scenario types for subject"""
-        vr_mapping = {
-            "science": ["virtual_lab", "molecular_visualization", "space_exploration"],
-            "history": ["historical_recreation", "time_travel", "archaeological_site"],
-            "mathematics": ["3d_geometry", "data_visualization", "abstract_concepts"],
-            "language": ["immersive_conversation", "cultural_immersion", "storytelling"],
-            "art": ["virtual_gallery", "3d_sculpting", "color_theory_space"]
-        }
-        return vr_mapping.get(subject.lower(), ["general_exploration", "interactive_environment"])
-    
-    async def _get_ar_types_for_subject(self, subject: str) -> List[str]:
-        """Get appropriate AR object types for subject"""
-        ar_mapping = {
-            "science": ["molecular_models", "anatomy_overlay", "physics_simulation"],
-            "history": ["artifact_reconstruction", "timeline_overlay", "map_enhancement"],
-            "mathematics": ["geometric_shapes", "graph_visualization", "equation_solver"],
-            "language": ["vocabulary_cards", "grammar_helper", "pronunciation_guide"],
-            "art": ["color_palette", "perspective_guide", "technique_demonstration"]
-        }
-        return ar_mapping.get(subject.lower(), ["information_overlay", "interactive_model"])
-    
-    # Fallback methods for error handling
-    async def _generate_fallback_lesson_plan(self, request: ContentGenerationRequest) -> Dict[str, Any]:
-        """Generate basic lesson plan when AI fails"""
-        return {
-            "title": f"{request.topic} - {request.difficulty_level.title()} Level",
-            "subject": request.subject,
-            "duration_minutes": request.duration_minutes,
-            "difficulty_level": request.difficulty_level,
-            "learning_objectives": request.learning_objectives,
-            "content": f"Basic lesson plan for {request.topic}",
-            "sections": [],
-            "generated_at": datetime.utcnow().isoformat()
-        }
-    
-    async def _generate_fallback_video_script(self, request: ContentGenerationRequest) -> str:
-        """Generate basic video script when AI fails"""
-        return f"Basic video script for {request.topic} lesson"
-    
-    async def _generate_fallback_slides(self, request: ContentGenerationRequest) -> List[Dict[str, Any]]:
-        """Generate basic slides when AI fails"""
-        return [
-            {
-                "title": f"Introduction to {request.topic}",
-                "content": "Basic slide content",
-                "slide_number": 1
+            self.logger.error(f"Failed to generate adaptive content: {e}")
+            return {
+                "adjusted_difficulty": difficulty_adjustment,
+                "additional_resources": ["Practice exercises"],
+                "practice_exercises": ["Review key concepts"],
+                "remedial_content": "Review fundamentals",
+                "advanced_challenges": ["Apply concepts"],
+                "next_topic_suggestion": "Related advanced topics"
             }
-        ]
-    
-    async def _generate_fallback_rubric(self, request: ContentGenerationRequest) -> Dict[str, Any]:
-        """Generate basic rubric when AI fails"""
-        return {
-            "title": f"Assessment Rubric - {request.topic}",
-            "learning_objectives": request.learning_objectives,
-            "rubric_content": "Basic assessment criteria",
-            "generated_at": datetime.utcnow().isoformat()
-        }
-
-    async def _generate_fallback_content_complete(self, request: ContentGenerationRequest) -> GeneratedContent:
-        """Generate complete fallback content when everything fails"""
-        return GeneratedContent(
-            lesson_plan=await self._generate_fallback_lesson_plan(request),
-            video_script=await self._generate_fallback_video_script(request),
-            presentation_slides=await self._generate_fallback_slides(request),
-            quiz_questions=[],
-            interactive_exercises=[],
-            vr_scenarios=[],
-            ar_objects=[],
-            accessibility_features={},
-            assessment_rubric=await self._generate_fallback_rubric(request),
-            additional_resources=[]
-        )
-
-    async def _get_fallback_content(self, index: int) -> Any:
-        """Get fallback content for specific component"""
-        fallbacks = [
-            await self._generate_fallback_video_script(ContentGenerationRequest(
-                subject="", topic="", difficulty_level="beginner",
-                duration_minutes=30, learning_objectives=[], target_audience=""
-            )),
-            await self._generate_fallback_slides(ContentGenerationRequest(
-                subject="", topic="", difficulty_level="beginner",
-                duration_minutes=30, learning_objectives=[], target_audience=""
-            )),
-            [],
-            [],
-            [],
-            [],
-            {},
-            await self._generate_fallback_rubric(ContentGenerationRequest(
-                subject="", topic="", difficulty_level="beginner",
-                duration_minutes=30, learning_objectives=[], target_audience=""
-            )),
-            []
-        ]
-        return fallbacks[index] if index < len(fallbacks) else None
-
-    def _generate_cache_key(self, request: ContentGenerationRequest) -> str:
-        """Generate cache key for content request"""
-        import hashlib
-        key_data = f"{request.subject}_{request.topic}_{request.difficulty_level}_{request.language}"
-        return hashlib.md5(key_data.encode()).hexdigest()
-
-    async def _get_cached_content(self, cache_key: str) -> Optional[GeneratedContent]:
-        """Get cached content if available"""
-        # Implementation for cache retrieval
-        return None
-
-    async def _cache_content(self, cache_key: str, content: GeneratedContent):
-        """Cache generated content for future use"""
-        # Implementation for caching
-        pass
-
-    async def _determine_tech_requirements(self, exercise_type: str) -> List[str]:
-        """Determine technology requirements for exercise type"""
-        tech_mapping = {
-            "simulation": ["computer", "high_speed_internet"],
-            "virtual_lab": ["computer", "vr_headset", "high_speed_internet"],
-            "case_study": ["computer", "internet"],
-            "problem_solving": ["computer"],
-            "collaborative_project": ["computer", "internet", "collaboration_tools"],
-            "gamified_challenge": ["computer", "internet"],
-            "role_playing": ["computer", "camera", "microphone"],
-            "decision_tree": ["computer"]
-        }
-        return tech_mapping.get(exercise_type, ["computer"])
-
-    async def _generate_exercise_accessibility(self, exercise_type: str) -> Dict[str, Any]:
-        """Generate accessibility features for exercise"""
-        return {
-            "screen_reader_compatible": True,
-            "keyboard_navigation": True,
-            "high_contrast_mode": True,
-            "alternative_input_methods": True,
-            "progressive_disclosure": True
-        }
-
-    async def _generate_vr_environment_spec(self, vr_type: str, topic: str) -> Dict[str, Any]:
-        """Generate VR environment specifications"""
-        return {
-            "environment_type": vr_type,
-            "interactivity_level": "high",
-            "safety_features": ["comfort_mode", "emergency_exit", "motion_sickness_prevention"],
-            "minimum_hardware": "Oculus Quest 2 or equivalent"
-        }
-
-    async def _generate_vr_interactions(self, vr_type: str, topic: str) -> List[str]:
-        """Generate VR interaction methods"""
-        return ["gaze_control", "hand_tracking", "voice_commands", "controller_input"]
-
-    async def _get_vr_hardware_requirements(self) -> Dict[str, Any]:
-        """Get VR hardware requirements"""
-        return {
-            "minimum_specs": "VR-ready PC or standalone headset",
-            "recommended_specs": "High-end gaming PC with dedicated GPU",
-            "network_requirements": "Broadband internet for multiplayer features"
-        }
-
-    async def _generate_vr_accessibility(self) -> Dict[str, Any]:
-        """Generate VR accessibility features"""
-        return {
-            "comfort_settings": ["seated_mode", "standing_mode", "room_scale"],
-            "motion_sickness_reduction": ["smooth_locomotion", "teleportation", "field_of_view_adjustment"],
-            "accessibility_controls": ["voice_control", "single_hand_mode", "cognitive_load_management"]
-        }
-
-    async def _generate_ar_model_specs(self, ar_type: str, topic: str) -> Dict[str, Any]:
-        """Generate AR model specifications"""
-        return {
-            "model_format": "glTF 2.0",
-            "file_size": "10-50MB",
-            "polygon_count": "5000-50000",
-            "texture_resolution": "1024x1024 to 2048x2048",
-            "animation_support": True
-        }
-
-    async def _generate_ar_interactions(self, ar_type: str) -> List[str]:
-        """Generate AR interaction methods"""
-        return ["touch_gestures", "voice_commands", "gaze_interaction", "spatial_gestures"]
-
-    async def _get_ar_tracking_requirements(self, ar_type: str) -> Dict[str, Any]:
-        """Get AR tracking requirements"""
-        return {
-            "tracking_method": "marker_based or markerless",
-            "camera_requirements": "6DOF tracking capability",
-            "lighting_conditions": "normal indoor lighting",
-            "surface_requirements": "flat surfaces for marker-based tracking"
-        }
-
-    async def _generate_ar_accessibility(self) -> Dict[str, Any]:
-        """Generate AR accessibility features"""
-        return {
-            "alternative_tracking": ["voice_guidance", "audio_cues", "tactile_markers"],
-            "visual_accessibility": ["high_contrast_mode", "large_text", "color_blind_friendly"],
-            "motor_accessibility": ["voice_control", "simple_gestures", "head_tracking"]
-        }
-    
-    async def _initialize_mock_models(self):
-        """Initialize mock models for development"""
-        logger.info("Initializing mock AI models for development...")
-        self.models = {
-            'text_generator': self._mock_text_generation,
-            'question_generator': self._mock_question_generation,
-            'image_generator': self._mock_image_generation
-        }
-    
-    def _mock_text_generation(self, prompt: str) -> str:
-        return f"Mock generated content for: {prompt[:50]}..."
-    
-    def _mock_question_generation(self, content: str) -> str:
-        return "Mock generated question based on content"
-    
-    def _mock_image_generation(self, prompt: str) -> str:
-        return f"data:image/svg+xml;base64,{base64.b64encode(f'<svg><text>{prompt}</text></svg>'.encode()).decode()}"
-    
-    async def cleanup(self):
-        """Cleanup resources"""
-        logger.info("AI Content Generator cleaned up")
 
 
-# Content generation utilities
-class ContentOptimizer:
-    """Optimize generated content for different platforms and accessibility"""
-    
-    @staticmethod
-    async def optimize_for_platform(content: GeneratedContent, platform: str) -> GeneratedContent:
-        """Optimize content for specific platform"""
-        # Implementation for platform-specific optimization
-        return content
-    
-    @staticmethod
-    async def optimize_for_accessibility(content: GeneratedContent, requirements: List[str]) -> GeneratedContent:
-        """Optimize content for accessibility requirements"""
-        # Implementation for accessibility optimization
-        return content
-    
-    @staticmethod
-    async def optimize_for_bandwidth(content: GeneratedContent, bandwidth: str) -> GeneratedContent:
-        """Optimize content for different bandwidth conditions"""
-        # Implementation for bandwidth optimization
-        return content
-
-
-class ContentPersonalizer:
-    """Personalize content based on user preferences and learning style"""
-    
-    @staticmethod
-    async def personalize_content(
-        content: GeneratedContent, 
-        user_profile: Dict[str, Any]
-    ) -> GeneratedContent:
-        """Personalize content for specific user"""
-        # Implementation for content personalization
-        return content
-    
-    @staticmethod
-    async def adapt_difficulty(
-        content: GeneratedContent, 
-        user_performance: Dict[str, Any]
-    ) -> GeneratedContent:
-        """Adapt content difficulty based on user performance"""
-        # Implementation for difficulty adaptation
-        return content
+# Global instance
+ai_content_generator = AIContentGenerator()
