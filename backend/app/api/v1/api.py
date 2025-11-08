@@ -16,7 +16,7 @@ from app.models.user import User
 from .endpoints import (
     auth, courses, enrollments, content, analytics, collaboration,
     certificates, adaptive_learning, payments,
-    categories, translations, websocket, app_updates
+    categories, translations, websocket, app_updates, discussions, subscriptions
 )
 
 # Create main API router
@@ -105,6 +105,20 @@ api_router.include_router(
     prefix="/app",
     tags=["App Updates"],
     responses={404: {"description": "Update not found"}}
+)
+
+api_router.include_router(
+    discussions.router,
+    prefix="/discussions",
+    tags=["Discussions"],
+    responses={404: {"description": "Discussion not found"}}
+)
+
+api_router.include_router(
+    subscriptions.router,
+    prefix="/subscriptions",
+    tags=["Subscriptions"],
+    responses={404: {"description": "Subscription not found"}}
 )
 
 # Security scheme

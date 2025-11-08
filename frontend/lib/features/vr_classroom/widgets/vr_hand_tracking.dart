@@ -94,39 +94,38 @@ class VRHandTracking extends StatefulWidget {
 
 class _VRHandTrackingState extends State<VRHandTracking>
     with TickerProviderStateMixin {
-  
   // Hand tracking state
   HandPosition? _leftHandPosition;
   HandPosition? _rightHandPosition;
-  
+
   // Gesture recognition state
   HandGesture _currentGesture = HandGesture.none;
   HandGesture _previousGesture = HandGesture.none;
   DateTime _lastGestureTime = DateTime.now();
-  
+
   // Animation controllers
   late AnimationController _leftHandController;
   late AnimationController _rightHandController;
   late AnimationController _gestureIndicatorController;
-  
+
   // Animations
   late Animation<double> _leftHandOpacity;
   late Animation<double> _rightHandOpacity;
   late Animation<double> _gestureIndicatorScale;
-  
+
   // Sensor subscriptions
   StreamSubscription<AccelerometerEvent>? _accelerometerSubscription;
   StreamSubscription<GyroscopeEvent>? _gyroscopeSubscription;
   StreamSubscription<MagnetometerEvent>? _magnetometerSubscription;
-  
+
   // Gesture detection
   final List<Offset> _gesturePoints = [];
   Timer? _gestureTimer;
-  
+
   // Calibration
   bool _isCalibrated = false;
   Offset _calibrationOffset = Offset.zero;
-  
+
   @override
   void initState() {
     super.initState();
@@ -178,21 +177,21 @@ class _VRHandTrackingState extends State<VRHandTracking>
 
   void _initializeSensors() {
     // Initialize accelerometer
-    _accelerometerSubscription = accelerometerEvents.listen(
+    _accelerometerSubscription = accelerometerEventStream().listen(
       (AccelerometerEvent event) {
         _processAccelerometerData(event);
       },
     );
 
     // Initialize gyroscope
-    _gyroscopeSubscription = gyroscopeEvents.listen(
+    _gyroscopeSubscription = gyroscopeEventStream().listen(
       (GyroscopeEvent event) {
         _processGyroscopeData(event);
       },
     );
 
     // Initialize magnetometer
-    _magnetometerSubscription = magnetometerEvents.listen(
+    _magnetometerSubscription = magnetometerEventStream().listen(
       (MagnetometerEvent event) {
         _processMagnetometerData(event);
       },
@@ -212,10 +211,9 @@ class _VRHandTrackingState extends State<VRHandTracking>
 
   void _processAccelerometerData(AccelerometerEvent event) {
     // Process accelerometer data for hand movement detection
-    final acceleration = math.sqrt(
-      event.x * event.x + event.y * event.y + event.z * event.z
-    );
-    
+    final acceleration =
+        math.sqrt(event.x * event.x + event.y * event.y + event.z * event.z);
+
     // Detect sudden movements for gesture recognition
     if (acceleration > 15.0) {
       _detectGestureFromMovement(event);
@@ -225,7 +223,7 @@ class _VRHandTrackingState extends State<VRHandTracking>
   void _processGyroscopeData(GyroscopeEvent event) {
     // Process gyroscope data for hand rotation
     final rotation = math.atan2(event.y, event.x);
-    
+
     // Update hand rotation if tracking
     if (_rightHandPosition != null) {
       _updateHandRotation(HandType.right, rotation);
@@ -240,13 +238,13 @@ class _VRHandTrackingState extends State<VRHandTracking>
   void _updateHandTracking() {
     // Simulate hand tracking using device sensors and touch input
     // In a real VR environment, this would use actual hand tracking hardware
-    
+
     // Update hand positions based on current tracking data
     _updateHandPositions();
-    
+
     // Detect gestures from hand positions
     _detectGesturesFromPositions();
-    
+
     // Update UI
     if (mounted) {
       setState(() {});
@@ -256,11 +254,11 @@ class _VRHandTrackingState extends State<VRHandTracking>
   void _updateHandPositions() {
     // Simulate hand position updates
     // In production, this would use actual VR hand tracking data
-    
+
     final now = DateTime.now();
-    
+
     // Mock left hand position
-    if (_leftHandPosition == null || 
+    if (_leftHandPosition == null ||
         now.difference(_leftHandPosition!.timestamp).inMilliseconds > 100) {
       _leftHandPosition = HandPosition(
         position: Offset(
@@ -272,12 +270,12 @@ class _VRHandTrackingState extends State<VRHandTracking>
         handType: HandType.left,
         timestamp: now,
       );
-      
+
       _leftHandController.forward();
     }
-    
+
     // Mock right hand position
-    if (_rightHandPosition == null || 
+    if (_rightHandPosition == null ||
         now.difference(_rightHandPosition!.timestamp).inMilliseconds > 100) {
       _rightHandPosition = HandPosition(
         position: Offset(
@@ -289,10 +287,10 @@ class _VRHandTrackingState extends State<VRHandTracking>
         handType: HandType.right,
         timestamp: now,
       );
-      
+
       _rightHandController.forward();
     }
-    
+
     // Notify position changes
     if (widget.onHandPositionChanged != null) {
       widget.onHandPositionChanged!(_leftHandPosition!, _rightHandPosition);
@@ -301,28 +299,31 @@ class _VRHandTrackingState extends State<VRHandTracking>
 
   void _detectGesturesFromPositions() {
     if (_leftHandPosition == null || _rightHandPosition == null) return;
-    
+
     // Calculate distance between hands
-    final distance = (_leftHandPosition!.position - _rightHandPosition!.position).distance;
-    
+    final distance =
+        (_leftHandPosition!.position - _rightHandPosition!.position).distance;
+
     // Detect gestures based on hand positions and movements
     HandGesture detectedGesture = HandGesture.none;
-    
+
     // Pinch gesture - hands close together
     if (distance < 50 && widget.enabledGestures.contains(HandGesture.pinch)) {
       detectedGesture = HandGesture.pinch;
     }
     // Grab gesture - hands in grabbing position
-    else if (distance > 100 && distance < 200 && 
-             widget.enabledGestures.contains(HandGesture.grab)) {
+    else if (distance > 100 &&
+        distance < 200 &&
+        widget.enabledGestures.contains(HandGesture.grab)) {
       detectedGesture = HandGesture.grab;
     }
     // Point gesture - one hand extended
-    else if (_rightHandPosition!.position.dy < _leftHandPosition!.position.dy - 50 &&
-             widget.enabledGestures.contains(HandGesture.point)) {
+    else if (_rightHandPosition!.position.dy <
+            _leftHandPosition!.position.dy - 50 &&
+        widget.enabledGestures.contains(HandGesture.point)) {
       detectedGesture = HandGesture.point;
     }
-    
+
     // Update gesture if changed
     if (detectedGesture != _currentGesture) {
       _onGestureChanged(detectedGesture);
@@ -331,13 +332,17 @@ class _VRHandTrackingState extends State<VRHandTracking>
 
   void _detectGestureFromMovement(AccelerometerEvent event) {
     // Detect swipe gestures from accelerometer data
-    if (event.x > 8.0 && widget.enabledGestures.contains(HandGesture.swipeRight)) {
+    if (event.x > 8.0 &&
+        widget.enabledGestures.contains(HandGesture.swipeRight)) {
       _onGestureDetected(HandGesture.swipeRight, HandType.right);
-    } else if (event.x < -8.0 && widget.enabledGestures.contains(HandGesture.swipeLeft)) {
+    } else if (event.x < -8.0 &&
+        widget.enabledGestures.contains(HandGesture.swipeLeft)) {
       _onGestureDetected(HandGesture.swipeLeft, HandType.right);
-    } else if (event.y > 8.0 && widget.enabledGestures.contains(HandGesture.swipeDown)) {
+    } else if (event.y > 8.0 &&
+        widget.enabledGestures.contains(HandGesture.swipeDown)) {
       _onGestureDetected(HandGesture.swipeDown, HandType.right);
-    } else if (event.y < -8.0 && widget.enabledGestures.contains(HandGesture.swipeUp)) {
+    } else if (event.y < -8.0 &&
+        widget.enabledGestures.contains(HandGesture.swipeUp)) {
       _onGestureDetected(HandGesture.swipeUp, HandType.right);
     }
   }
@@ -346,7 +351,7 @@ class _VRHandTrackingState extends State<VRHandTracking>
     _previousGesture = _currentGesture;
     _currentGesture = newGesture;
     _lastGestureTime = DateTime.now();
-    
+
     if (newGesture != HandGesture.none) {
       _onGestureDetected(newGesture, HandType.right);
     }
@@ -357,19 +362,19 @@ class _VRHandTrackingState extends State<VRHandTracking>
     if (widget.enableHapticFeedback) {
       HapticFeedback.lightImpact();
     }
-    
+
     // Animate gesture indicator
     _gestureIndicatorController.reset();
     _gestureIndicatorController.forward();
-    
+
     // Create gesture event
     final gestureEvent = GestureEvent(
       gesture: gesture,
       handType: handType,
-      position: handType == HandType.left 
+      position: handType == HandType.left
           ? _leftHandPosition?.position ?? Offset.zero
           : _rightHandPosition?.position ?? Offset.zero,
-      confidence: handType == HandType.left 
+      confidence: handType == HandType.left
           ? _leftHandPosition?.confidence ?? 0.0
           : _rightHandPosition?.confidence ?? 0.0,
       timestamp: DateTime.now(),
@@ -378,7 +383,7 @@ class _VRHandTrackingState extends State<VRHandTracking>
         'previous_gesture': _previousGesture.toString(),
       },
     );
-    
+
     // Notify gesture detection
     if (widget.onGestureDetected != null) {
       widget.onGestureDetected!(gestureEvent);
@@ -422,7 +427,8 @@ class _VRHandTrackingState extends State<VRHandTracking>
                 left: _leftHandPosition!.position.dx - 25,
                 top: _leftHandPosition!.position.dy - 25,
                 child: Opacity(
-                  opacity: _leftHandOpacity.value * _leftHandPosition!.confidence,
+                  opacity:
+                      _leftHandOpacity.value * _leftHandPosition!.confidence,
                   child: Transform.rotate(
                     angle: _leftHandPosition!.rotation,
                     child: _buildHandIndicator(HandType.left),
@@ -441,7 +447,8 @@ class _VRHandTrackingState extends State<VRHandTracking>
                 left: _rightHandPosition!.position.dx - 25,
                 top: _rightHandPosition!.position.dy - 25,
                 child: Opacity(
-                  opacity: _rightHandOpacity.value * _rightHandPosition!.confidence,
+                  opacity:
+                      _rightHandOpacity.value * _rightHandPosition!.confidence,
                   child: Transform.rotate(
                     angle: _rightHandPosition!.rotation,
                     child: _buildHandIndicator(HandType.right),
@@ -477,7 +484,7 @@ class _VRHandTrackingState extends State<VRHandTracking>
 
   Widget _buildHandIndicator(HandType handType) {
     final color = handType == HandType.left ? Colors.blue : Colors.red;
-    
+
     return Container(
       width: 50,
       height: 50,
@@ -504,7 +511,7 @@ class _VRHandTrackingState extends State<VRHandTracking>
   Widget _buildGestureIndicator(HandGesture gesture) {
     IconData icon;
     Color color;
-    
+
     switch (gesture) {
       case HandGesture.point:
         icon = Icons.touch_app;
@@ -546,7 +553,7 @@ class _VRHandTrackingState extends State<VRHandTracking>
         icon = Icons.gesture;
         color = Colors.grey;
     }
-    
+
     return Container(
       width: 80,
       height: 80,

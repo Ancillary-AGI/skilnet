@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/auth/presentation/pages/login_page.dart';
-import '../../features/auth/presentation/pages/register_page.dart';
-import '../../features/home/presentation/pages/home_page.dart';
-import '../../features/onboarding/presentation/pages/onboarding_page.dart';
-import '../../features/dashboard/presentation/pages/dashboard_page.dart';
-import '../../features/courses/presentation/pages/courses_page.dart';
-import '../../features/profile/presentation/pages/profile_page.dart';
-import '../../features/settings/presentation/pages/settings_page.dart';
+import '../../features/auth/screens/login_screen.dart';
+import '../../features/auth/screens/register_screen.dart';
+import '../../features/home/screens/home_screen.dart';
+import '../../features/onboarding/screens/onboarding_screen.dart';
+import '../../features/dashboard/screens/dashboard_screen.dart';
+import '../../features/courses/screens/course_catalog_screen.dart';
+import '../../features/profile/screens/profile_screen.dart';
+import '../../features/settings/screens/settings_screen.dart';
 import '../services/cache_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
@@ -19,32 +19,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/onboarding',
         name: 'onboarding',
-        builder: (context, state) => const OnboardingPage(),
+        builder: (context, state) => const OnboardingScreen(),
       ),
       GoRoute(
         path: '/login',
         name: 'login',
-        builder: (context, state) => const LoginPage(),
+        builder: (context, state) => const LoginScreen(),
       ),
       GoRoute(
         path: '/register',
         name: 'register',
-        builder: (context, state) => const RegisterPage(),
+        builder: (context, state) => const RegisterScreen(),
       ),
       GoRoute(
         path: '/home',
         name: 'home',
-        builder: (context, state) => const HomePage(),
+        builder: (context, state) => const HomeScreen(),
       ),
       GoRoute(
         path: '/dashboard',
         name: 'dashboard',
-        builder: (context, state) => const DashboardPage(),
+        builder: (context, state) => const DashboardScreen(),
       ),
       GoRoute(
         path: '/courses',
         name: 'courses',
-        builder: (context, state) => const CoursesPage(),
+        builder: (context, state) => const CourseCatalogScreen(),
         routes: [
           GoRoute(
             path: '/:courseId',
@@ -59,12 +59,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/profile',
         name: 'profile',
-        builder: (context, state) => const ProfilePage(),
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/settings',
         name: 'settings',
-        builder: (context, state) => const SettingsPage(),
+        builder: (context, state) => const SettingsScreen(),
       ),
       // Additional routes
       GoRoute(
@@ -86,19 +86,22 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       try {
         final isLoggedIn = CacheService.isLoggedIn;
-        final isOnboarding = CacheService.getSetting('onboarding_completed') ?? false;
-        
+        final isOnboarding =
+            CacheService.getSetting('onboarding_completed') ?? false;
+
         // If not onboarded, go to onboarding
         if (!isOnboarding && state.matchedLocation != '/onboarding') {
           return '/onboarding';
         }
-        
+
         // If not logged in and trying to access protected routes
         final protectedRoutes = ['/dashboard', '/profile', '/courses'];
-        if (!isLoggedIn && protectedRoutes.any((route) => state.matchedLocation.startsWith(route))) {
+        if (!isLoggedIn &&
+            protectedRoutes
+                .any((route) => state.matchedLocation.startsWith(route))) {
           return '/login';
         }
-        
+
         return null; // No redirect needed
       } catch (e) {
         // Fallback for tests or when cache is not initialized
@@ -136,9 +139,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
 String _getInitialRoute() {
   try {
-    final isOnboarded = CacheService.getSetting('onboarding_completed') ?? false;
+    final isOnboarded =
+        CacheService.getSetting('onboarding_completed') ?? false;
     final isLoggedIn = CacheService.isLoggedIn;
-    
+
     if (!isOnboarded) return '/onboarding';
     if (!isLoggedIn) return '/home';
     return '/dashboard';
@@ -151,9 +155,9 @@ String _getInitialRoute() {
 // Placeholder pages for additional routes
 class CourseDetailPage extends StatelessWidget {
   final String courseId;
-  
+
   const CourseDetailPage({super.key, required this.courseId});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -167,7 +171,7 @@ class CourseDetailPage extends StatelessWidget {
 
 class SearchPage extends StatelessWidget {
   const SearchPage({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -181,7 +185,7 @@ class SearchPage extends StatelessWidget {
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -195,7 +199,7 @@ class NotificationsPage extends StatelessWidget {
 
 class AchievementsPage extends StatelessWidget {
   const AchievementsPage({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(

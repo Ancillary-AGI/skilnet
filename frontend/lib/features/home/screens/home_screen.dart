@@ -16,7 +16,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   Map<String, dynamic>? _userAnalytics;
-  List<dynamic>? _userCourses;
+  Map<String, dynamic>? _userCourses;
   bool _isLoading = true;
 
   @override
@@ -31,7 +31,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     });
 
     try {
-      final apiService = ref.watch(app.apiServiceProvider);
+      final apiService = ApiService.instance;
 
       // Load user analytics and courses
       final analytics = await apiService.getUserAnalytics();

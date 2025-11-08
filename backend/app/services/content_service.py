@@ -414,15 +414,31 @@ class ContentService:
 
     async def _validate_course_ownership(self, course_id: str, instructor_id: str) -> Optional[Course]:
         """Validate that user owns the course"""
-        # This would query the database to check course ownership
-        # For now, return a mock course object
-        from app.services.course_service import CourseService
-        from app.core.database import get_db
-        from sqlalchemy.ext.asyncio import AsyncSession
+        try:
+            # Query the database to check course ownership
+            from app.core.database import get_db
+            from sqlalchemy.ext.asyncio import AsyncSession
+            from sqlalchemy import select
 
-        # This is a simplified version - in real implementation,
-        # we'd inject the db session properly
-        return None  # Placeholder
+            async with get_db() as db:
+                # Query to check if the user is the instructor of the course
+                result = await db.execute(
+                    select(Course).where(
+                        Course.id == course_id,
+                        Course.instructor_id == instructor_id
+                    )
+                )
+                course = result.scalar_one_or_none()
+
+                if course:
+                    return course
+                else:
+                    self.logger.warning(f"Course {course_id} not found or user {instructor_id} is not the instructor")
+                    return None
+
+        except Exception as e:
+            self.logger.error(f"Error validating course ownership: {e}")
+            return None
 
 
 # Global content service instance

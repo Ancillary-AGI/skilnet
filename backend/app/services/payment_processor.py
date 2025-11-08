@@ -265,33 +265,98 @@ class PaymentProcessor:
 
     async def _handle_payment_success(self, payment_intent: Dict[str, Any]):
         """Handle successful payment"""
-        self.logger.info(f"Payment succeeded: {payment_intent.get('id')}")
-        # TODO: Update database with payment success
-        # TODO: Grant course access to user
-        # TODO: Send confirmation email
+        try:
+            payment_intent_id = payment_intent.get('id')
+            user_id = payment_intent.get('metadata', {}).get('user_id')
+            course_id = payment_intent.get('metadata', {}).get('course_id')
+
+            self.logger.info(f"Payment succeeded: {payment_intent_id}")
+
+            # Update database with payment success
+            await self._update_payment_status(payment_intent_id, 'succeeded', payment_intent)
+
+            # Grant course access to user if course_id is provided
+            if user_id and course_id:
+                await self._grant_course_access(user_id, course_id, payment_intent)
+
+            # Send confirmation email
+            await self._send_payment_confirmation_email(user_id, payment_intent)
+
+        except Exception as e:
+            self.logger.error(f"Failed to handle payment success: {e}")
 
     async def _handle_payment_failure(self, payment_intent: Dict[str, Any]):
         """Handle failed payment"""
-        self.logger.warning(f"Payment failed: {payment_intent.get('id')}")
-        # TODO: Log payment failure
-        # TODO: Notify user of failure
+        try:
+            payment_intent_id = payment_intent.get('id')
+            user_id = payment_intent.get('metadata', {}).get('user_id')
+
+            self.logger.warning(f"Payment failed: {payment_intent_id}")
+
+            # Update database with payment failure
+            await self._update_payment_status(payment_intent_id, 'failed', payment_intent)
+
+            # Log payment failure for analytics
+            await self._log_payment_failure(payment_intent)
+
+            # Notify user of failure
+            if user_id:
+                await self._send_payment_failure_notification(user_id, payment_intent)
+
+        except Exception as e:
+            self.logger.error(f"Failed to handle payment failure: {e}")
 
     async def _handle_subscription_created(self, subscription: Dict[str, Any]):
         """Handle subscription creation"""
-        self.logger.info(f"Subscription created: {subscription.get('id')}")
-        # TODO: Update user subscription status
-        # TODO: Grant premium access
+        try:
+            subscription_id = subscription.get('id')
+            user_id = subscription.get('metadata', {}).get('user_id')
+
+            self.logger.info(f"Subscription created: {subscription_id}")
+
+            # Update user subscription status
+            if user_id:
+                await self._update_user_subscription(user_id, subscription, 'active')
+
+            # Grant premium access
+            await self._grant_premium_access(user_id, subscription)
+
+        except Exception as e:
+            self.logger.error(f"Failed to handle subscription creation: {e}")
 
     async def _handle_subscription_updated(self, subscription: Dict[str, Any]):
         """Handle subscription updates"""
-        self.logger.info(f"Subscription updated: {subscription.get('id')}")
-        # TODO: Update subscription details in database
+        try:
+            subscription_id = subscription.get('id')
+            user_id = subscription.get('metadata', {}).get('user_id')
+            status = subscription.get('status')
+
+            self.logger.info(f"Subscription updated: {subscription_id}")
+
+            # Update subscription details in database
+            if user_id:
+                await self._update_user_subscription(user_id, subscription, status)
+
+        except Exception as e:
+            self.logger.error(f"Failed to handle subscription update: {e}")
 
     async def _handle_subscription_cancelled(self, subscription: Dict[str, Any]):
         """Handle subscription cancellation"""
-        self.logger.info(f"Subscription cancelled: {subscription.get('id')}")
-        # TODO: Update user subscription status
-        # TODO: Revoke premium access if needed
+        try:
+            subscription_id = subscription.get('id')
+            user_id = subscription.get('metadata', {}).get('user_id')
+
+            self.logger.info(f"Subscription cancelled: {subscription_id}")
+
+            # Update user subscription status
+            if user_id:
+                await self._update_user_subscription(user_id, subscription, 'cancelled')
+
+            # Revoke premium access if needed
+            await self._revoke_premium_access(user_id, subscription)
+
+        except Exception as e:
+            self.logger.error(f"Failed to handle subscription cancellation: {e}")
 
     @log_performance
     async def get_subscription_plans(self) -> List[Dict[str, Any]]:

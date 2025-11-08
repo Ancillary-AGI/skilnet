@@ -9,7 +9,6 @@ import 'core/services/auth_service.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/update_manager.dart';
 import 'core/theme/app_theme.dart';
 import 'core/providers/app_providers.dart';
 
@@ -44,9 +43,6 @@ void main() async {
 
   // Initialize API service
   await ApiService.instance.initialize();
-  
-  // Initialize Auth service
-  await AuthService.instance.initialize();
 
   runApp(
     const ProviderScope(
@@ -63,37 +59,35 @@ class EduVerseApp extends ConsumerWidget {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeProvider);
 
-    return UpdateHandler(
-      child: MaterialApp.router(
-        title: AppConfig.appName,
-        debugShowCheckedModeBanner: AppConfig.debugMode,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: themeMode,
+    return MaterialApp.router(
+      title: AppConfig.appName,
+      debugShowCheckedModeBanner: AppConfig.debugMode,
+      theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: themeMode,
 
-        // Router configuration
-        routerConfig: router,
+      // Router configuration
+      routerConfig: router,
 
-        // Localization
-        supportedLocales: AppConfig.supportedLocales,
-        locale: ref.watch(localeProvider),
+      // Localization
+      supportedLocales: AppConfig.supportedLocales,
+      locale: ref.watch(localeProvider),
 
-        // Builder for responsive design and error handling
-        builder: (context, child) {
-          // Handle text scaling
-          final mediaQuery = MediaQuery.of(context);
-          final scaledChild = MediaQuery(
-            data: mediaQuery.copyWith(
-              textScaler: TextScaler.linear(
-                mediaQuery.textScaleFactor.clamp(0.8, 1.2),
-              ),
+      // Builder for responsive design and error handling
+      builder: (context, child) {
+        // Handle text scaling
+        final mediaQuery = MediaQuery.of(context);
+        final scaledChild = MediaQuery(
+          data: mediaQuery.copyWith(
+            textScaler: TextScaler.linear(
+              mediaQuery.textScaleFactor.clamp(0.8, 1.2),
             ),
-            child: child ?? const SizedBox.shrink(),
-          );
+          ),
+          child: child ?? const SizedBox.shrink(),
+        );
 
-          return scaledChild;
-        },
-      ),
+        return scaledChild;
+      },
     );
   }
 }
