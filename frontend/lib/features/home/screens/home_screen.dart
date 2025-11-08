@@ -26,27 +26,31 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   }
 
   Future<void> _loadUserData() async {
-    setState(() {
-      _isLoading = true;
-    });
+    if (!mounted) return;
+
+    setState(() => _isLoading = true);
 
     try {
       final apiService = ApiService.instance;
 
       // Load user analytics and courses
-      final analytics = await apiService.getUserAnalytics();
-      final courses = await apiService.getCourses();
+      final analyticsResponse = await apiService.getUserAnalytics();
+      final coursesResponse = await apiService.getCourses();
 
-      setState(() {
-        _userAnalytics = analytics;
-        _userCourses = courses;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      _showSnackBar('Failed to load data. Please try again.');
+      if (mounted) {
+        setState(() {
+          _userAnalytics = analyticsResponse;
+          _userCourses = coursesResponse;
+          _isLoading = false;
+        });
+      }
+    } catch (e, stackTrace) {
+      print('Error loading user data: $e');
+      print('Stack trace: $stackTrace');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        _showSnackBar('Failed to load data. Please try again.');
+      }
     }
   }
 

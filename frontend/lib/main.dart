@@ -41,8 +41,7 @@ void main() async {
     ),
   );
 
-  // Initialize API service
-  await ApiService.instance.initialize();
+  // API service is now auto-initialized
 
   runApp(
     const ProviderScope(
