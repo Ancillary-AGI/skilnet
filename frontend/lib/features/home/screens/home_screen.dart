@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:percent_indicator/percent_indicator.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_service.dart';
 import '../../../core/providers/app_providers.dart' as app;
@@ -15,8 +14,6 @@ class HomeScreen extends ConsumerStatefulWidget {
 }
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
-  Map<String, dynamic>? _userAnalytics;
-  Map<String, dynamic>? _userCourses;
   bool _isLoading = true;
 
   @override
@@ -31,18 +28,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final apiService = ApiService.instance;
-
-      // Load user analytics and courses
-      final analyticsResponse = await apiService.getUserAnalytics();
-      final coursesResponse = await apiService.getCourses();
+      // Load user analytics and courses (for future use)
+      await ApiService.instance.getUserAnalytics();
+      await ApiService.instance.getCourses();
 
       if (mounted) {
-        setState(() {
-          _userAnalytics = analyticsResponse;
-          _userCourses = coursesResponse;
-          _isLoading = false;
-        });
+        setState(() => _isLoading = false);
       }
     } catch (e, stackTrace) {
       print('Error loading user data: $e');
@@ -307,7 +298,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.5),
+        color: Theme.of(context)
+            .colorScheme
+            .surfaceContainerHighest
+            .withOpacity(0.5),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
         border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
       ),
@@ -341,7 +335,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           const SizedBox(height: 12),
           LinearProgressIndicator(
             value: 0.6,
-            backgroundColor: Theme.of(context).colorScheme.surfaceVariant,
+            backgroundColor:
+                Theme.of(context).colorScheme.surfaceContainerHighest,
             valueColor: AlwaysStoppedAnimation<Color>(
               Theme.of(context).colorScheme.primary,
             ),
@@ -516,7 +511,7 @@ class _CourseCard extends StatelessWidget {
                   LinearProgressIndicator(
                     value: progress,
                     backgroundColor:
-                        Theme.of(context).colorScheme.surfaceVariant,
+                        Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                   const SizedBox(height: 4),
                   Text(

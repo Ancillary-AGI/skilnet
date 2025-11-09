@@ -12,8 +12,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 # Set test environment variables
-os.environ["DB_TYPE"] = "sqlite"
-os.environ["SQLITE_PATH"] = ":memory:"
+os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["SECRET_KEY"] = "test-secret-key-for-testing-only"
 os.environ["DEBUG"] = "true"
 os.environ["TESTING"] = "true"

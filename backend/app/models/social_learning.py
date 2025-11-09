@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 from enum import Enum
 from sqlmodel import SQLModel, Field
+from sqlalchemy import Column, JSON
 
 class StudyGroupType(str, Enum):
     PUBLIC = "public"
@@ -45,13 +46,13 @@ class StudyGroup(SQLModel, table=True):
     requires_approval: bool = Field(default=False)
 
     # Learning Focus
-    learning_objectives: List[str] = Field(default_factory=list)
-    meeting_schedule: Dict[str, Any] = Field(default_factory=dict)
-    study_materials: List[Dict[str, Any]] = Field(default_factory=list)
+    learning_objectives: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    meeting_schedule: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
+    study_materials: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Gamification
     group_points: int = Field(default=0)
-    achievements_unlocked: List[str] = Field(default_factory=list)
+    achievements_unlocked: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Communication
     discussion_forum_enabled: bool = Field(default=True)
@@ -61,7 +62,7 @@ class StudyGroup(SQLModel, table=True):
     # Metadata
     created_by: str = Field(nullable=False)
     is_active: bool = Field(default=True)
-    tags: List[str] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -107,7 +108,7 @@ class DiscussionForum(SQLModel, table=True):
     requires_course_enrollment: bool = Field(default=False)
 
     # Categories
-    categories: List[str] = Field(default_factory=list)
+    categories: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Statistics
     total_posts: int = Field(default=0)
@@ -139,8 +140,8 @@ class ForumPost(SQLModel, table=True):
     thread_id: str = Field(nullable=False, index=True)  # Root post ID
 
     # Metadata
-    tags: List[str] = Field(default_factory=list)
-    attachments: List[Dict[str, Any]] = Field(default_factory=list)
+    tags: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    attachments: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Engagement
     upvotes: int = Field(default=0)
@@ -172,7 +173,7 @@ class PeerLearningSession(SQLModel, table=True):
 
     # Participants
     host_id: str = Field(nullable=False)
-    participants: List[str] = Field(default_factory=list)  # User IDs
+    participants: List[str] = Field(default_factory=list, sa_column=Column(JSON))  # User IDs
     max_participants: int = Field(default=10)
 
     # Session Details
@@ -187,8 +188,8 @@ class PeerLearningSession(SQLModel, table=True):
     actual_end: Optional[datetime] = Field(default=None)
 
     # Learning Focus
-    learning_objectives: List[str] = Field(default_factory=list)
-    materials_to_cover: List[Dict[str, Any]] = Field(default_factory=list)
+    learning_objectives: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    materials_to_cover: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Communication
     video_enabled: bool = Field(default=True)
@@ -202,7 +203,7 @@ class PeerLearningSession(SQLModel, table=True):
     # Analytics
     attendance_count: int = Field(default=0)
     average_rating: float = Field(default=0.0)
-    feedback_collected: List[Dict[str, Any]] = Field(default_factory=list)
+    feedback_collected: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -217,7 +218,7 @@ class StudyBuddyMatch(SQLModel, table=True):
 
     # Matching Criteria
     matching_score: float = Field(default=0.0)
-    matching_factors: Dict[str, Any] = Field(default_factory=dict)  # learning_style, goals, schedule, etc.
+    matching_factors: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))  # learning_style, goals, schedule, etc.
 
     # Relationship Status
     status: str = Field(default="pending")  # pending, accepted, active, ended
@@ -225,11 +226,11 @@ class StudyBuddyMatch(SQLModel, table=True):
 
     # Study Preferences
     study_frequency: str = Field(default="weekly")  # daily, weekly, biweekly
-    preferred_times: List[str] = Field(default_factory=list)  # time slots
-    study_goals: List[str] = Field(default_factory=list)
+    preferred_times: List[str] = Field(default_factory=list, sa_column=Column(JSON))  # time slots
+    study_goals: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Communication Preferences
-    preferred_platforms: List[str] = Field(default_factory=list)  # discord, zoom, etc.
+    preferred_platforms: List[str] = Field(default_factory=list, sa_column=Column(JSON))  # discord, zoom, etc.
     communication_style: str = Field(default="balanced")  # quiet, balanced, social
 
     # Activity Tracking
@@ -259,7 +260,7 @@ class CollaborativeProject(SQLModel, table=True):
     project_type: str = Field(default="assignment")  # assignment, research, creative, practical
 
     # Team Configuration
-    team_members: List[str] = Field(default_factory=list)  # User IDs
+    team_members: List[str] = Field(default_factory=list, sa_column=Column(JSON))  # User IDs
     max_team_size: int = Field(default=4)
     min_team_size: int = Field(default=2)
 
@@ -269,13 +270,13 @@ class CollaborativeProject(SQLModel, table=True):
     submission_date: Optional[datetime] = Field(default=None)
 
     # Requirements
-    deliverables: List[Dict[str, Any]] = Field(default_factory=list)
-    evaluation_criteria: List[Dict[str, Any]] = Field(default_factory=list)
-    resources_provided: List[Dict[str, Any]] = Field(default_factory=list)
+    deliverables: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    evaluation_criteria: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    resources_provided: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Progress Tracking
     completion_percentage: float = Field(default=0.0)
-    milestones: List[Dict[str, Any]] = Field(default_factory=list)
+    milestones: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
     current_milestone: Optional[str] = Field(default=None)
 
     # Communication
@@ -284,7 +285,7 @@ class CollaborativeProject(SQLModel, table=True):
 
     # Evaluation
     peer_reviews_required: bool = Field(default=True)
-    instructor_evaluation: Optional[Dict[str, Any]] = Field(default=None)
+    instructor_evaluation: Optional[Dict[str, Any]] = Field(default=None, sa_column=Column(JSON))
     final_grade: Optional[str] = Field(default=None)
 
     # Status
@@ -319,12 +320,12 @@ class UserContribution(SQLModel, table=True):
 
     # Learning Impact
     students_helped: int = Field(default=0)
-    knowledge_shared: List[str] = Field(default_factory=list)
-    skills_demonstrated: List[str] = Field(default_factory=list)
+    knowledge_shared: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    skills_demonstrated: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Rewards
     points_earned: int = Field(default=0)
-    badges_unlocked: List[str] = Field(default_factory=list)
+    badges_unlocked: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     created_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -338,28 +339,28 @@ class LearningCommunity(SQLModel, table=True):
 
     # Community Focus
     primary_subject: str = Field(nullable=False)
-    secondary_subjects: List[str] = Field(default_factory=list)
-    skill_levels: List[str] = Field(default_factory=list)
+    secondary_subjects: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    skill_levels: List[str] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Membership
     member_count: int = Field(default=0)
     is_public: bool = Field(default=True)
-    membership_rules: Dict[str, Any] = Field(default_factory=dict)
+    membership_rules: Dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON))
 
     # Activities
-    regular_events: List[Dict[str, Any]] = Field(default_factory=list)
-    discussion_topics: List[str] = Field(default_factory=list)
-    shared_resources: List[Dict[str, Any]] = Field(default_factory=list)
+    regular_events: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
+    discussion_topics: List[str] = Field(default_factory=list, sa_column=Column(JSON))
+    shared_resources: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Governance
-    moderators: List[str] = Field(default_factory=list)
+    moderators: List[str] = Field(default_factory=list, sa_column=Column(JSON))
     community_guidelines: str = Field(default="")
     code_of_conduct: str = Field(default="")
 
     # Engagement Metrics
     activity_score: float = Field(default=0.0)
     average_member_engagement: float = Field(default=0.0)
-    top_contributors: List[Dict[str, Any]] = Field(default_factory=list)
+    top_contributors: List[Dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON))
 
     # Status
     is_active: bool = Field(default=True)

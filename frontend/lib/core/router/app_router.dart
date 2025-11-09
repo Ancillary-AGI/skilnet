@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../features/auth/screens/login_screen.dart';
-import '../../features/auth/screens/register_screen.dart';
-import '../../features/home/screens/home_screen.dart';
-import '../../features/onboarding/screens/onboarding_screen.dart';
-import '../../features/dashboard/screens/dashboard_screen.dart';
-import '../../features/courses/screens/course_catalog_screen.dart';
-import '../../features/profile/screens/profile_screen.dart';
-import '../../features/settings/screens/settings_screen.dart';
-import '../services/cache_service.dart';
+import 'package:eduverse/features/auth/screens/login_screen.dart';
+import 'package:eduverse/features/auth/screens/register_screen.dart';
+import 'package:eduverse/features/home/screens/home_screen.dart';
+import 'package:eduverse/features/onboarding/screens/onboarding_screen.dart';
+import 'package:eduverse/features/dashboard/screens/dashboard_screen.dart';
+import 'package:eduverse/features/courses/screens/course_catalog_screen.dart';
+import 'package:eduverse/features/courses/screens/course_detail_screen.dart';
+import 'package:eduverse/features/ai_tutor/screens/ai_tutor_screen.dart';
+import 'package:eduverse/features/vr_classroom/screens/vr_classroom_screen.dart';
+import 'package:eduverse/features/profile/screens/profile_screen.dart';
+import 'package:eduverse/features/settings/screens/settings_screen.dart';
+import 'package:eduverse/core/services/cache_service.dart';
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -65,6 +68,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: '/settings',
         name: 'settings',
         builder: (context, state) => const SettingsScreen(),
+      ),
+      GoRoute(
+        path: '/ai-tutor',
+        name: 'ai-tutor',
+        builder: (context, state) => const AITutorScreen(),
+      ),
+      GoRoute(
+        path: '/vr-classroom',
+        name: 'vr-classroom',
+        builder: (context, state) =>
+            const VRClassroomScreen(roomId: 'default-room'),
       ),
       // Additional routes
       GoRoute(

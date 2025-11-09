@@ -90,7 +90,7 @@ class AIContentGenerator:
             }}
             """
 
-            response = await openai.ChatCompletion.acreate(
+            response = openai.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert course designer and educator. Generate high-quality, engaging course content."},
@@ -160,7 +160,7 @@ class AIContentGenerator:
             ]
             """
 
-            response = await openai.ChatCompletion.acreate(
+            response = openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are an expert educator creating high-quality assessment questions."},
@@ -208,7 +208,7 @@ class AIContentGenerator:
             - Be suitable for course catalog display
             """
 
-            response = await openai.ChatCompletion.acreate(
+            response = openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are a marketing copywriter specializing in educational content."},
@@ -255,7 +255,7 @@ class AIContentGenerator:
             Focus on logical progression and skill building.
             """
 
-            response = await openai.ChatCompletion.acreate(
+            response = openai.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are an expert learning path designer and career counselor."},
@@ -299,7 +299,7 @@ class AIContentGenerator:
             }}
             """
 
-            response = await openai.ChatCompletion.acreate(
+            response = openai.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": "You are a learning analytics expert analyzing student performance data."},
@@ -350,7 +350,7 @@ class AIContentGenerator:
             }}
             """
 
-            response = await openai.ChatCompletion.acreate(
+            response = openai.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[
                     {"role": "system", "content": "You are an adaptive learning specialist creating personalized content."},

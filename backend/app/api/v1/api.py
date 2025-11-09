@@ -16,7 +16,8 @@ from app.models.user import User
 from .endpoints import (
     auth, courses, enrollments, content, analytics, collaboration,
     certificates, adaptive_learning, payments,
-    categories, translations, websocket, app_updates, discussions, subscriptions
+    categories, websocket, discussions, subscriptions,
+    translations, app_updates
 )
 
 # Create main API router
@@ -124,71 +125,8 @@ api_router.include_router(
 # Security scheme
 security = HTTPBearer()
 
-# Dependency for getting current user
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Dependency to get current authenticated user
-    Validates JWT tokens and retrieves user from database
-    """
-    token = credentials.credentials
-
-    try:
-        # Import JWT utilities
-        import jwt
-        from datetime import datetime, timedelta
-        from app.core.config import settings
-
-        # Decode and validate JWT token
-        payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
-            algorithms=[settings.JWT_ALGORITHM]
-        )
-
-        # Check if token is expired
-        exp = payload.get('exp')
-        if exp and datetime.utcnow().timestamp() > exp:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has expired",
-                headers={"WWW-Authenticate": "Bearer"},
-            )
-
-        # Get user from database
-        from app.core.database import SessionLocal
-        db = SessionLocal()
-        try:
-            user = db.query(User).filter(User.id == payload['user_id']).first()
-            if not user:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User not found",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-            if not user.is_active:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="User account is deactivated",
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-
-            return user
-        finally:
-            db.close()
-
-    except jwt.PyJWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid authentication credentials",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+# Import the get_current_user function from auth endpoints
+from .endpoints.auth import get_current_user
 
 # Global exception handlers
 # Note: These are handled by the main FastAPI app

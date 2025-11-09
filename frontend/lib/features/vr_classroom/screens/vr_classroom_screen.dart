@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../core/theme/app_theme.dart';
-import '../../../core/app_config.dart';
-import '../../../shared/widgets/adaptive_scaffold.dart';
+import 'package:eduverse/core/theme/app_theme.dart';
+import 'package:eduverse/core/app_config.dart';
+import 'package:eduverse/shared/widgets/adaptive_scaffold.dart';
 
 // Responsive value extension for BuildContext
 extension ResponsiveExtension on BuildContext {
@@ -138,7 +137,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
               Container(
                 padding: const EdgeInsets.all(AppTheme.spacing3),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.2),
+                  color: Colors.white.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                 ),
                 child: const Icon(
@@ -164,7 +163,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
                     Text(
                       'Room ID: ${widget.roomId}',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                     ),
                   ],
@@ -176,7 +175,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
                   vertical: AppTheme.spacing2,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.2),
+                  color: Colors.green.withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
                 ),
                 child: Row(
@@ -225,7 +224,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
       child: Container(
         padding: const EdgeInsets.all(AppTheme.spacing3),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
         ),
         child: Column(
@@ -242,7 +241,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
             Text(
               label,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
             ),
           ],
@@ -318,9 +317,9 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
     return Container(
       padding: const EdgeInsets.all(AppTheme.spacing4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -391,7 +390,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
             child: Container(
               padding: const EdgeInsets.all(AppTheme.spacing2),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
+                color: Colors.black.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
               ),
               child: Row(
@@ -426,11 +425,11 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
       width: 60,
       height: 60,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.8),
+        color: color.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.3),
+            color: color.withValues(alpha: 0.3),
             blurRadius: 8,
             spreadRadius: 2,
           ),
@@ -524,7 +523,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 4,
             spreadRadius: 2,
           ),
@@ -590,9 +589,9 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
       width: 120,
       padding: const EdgeInsets.all(AppTheme.spacing3),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(AppTheme.radiusLarge),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -680,7 +679,7 @@ class VRGridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.1)
+      ..color = Colors.white.withValues(alpha: 0.1)
       ..strokeWidth = 1;
 
     const gridSize = 20.0;

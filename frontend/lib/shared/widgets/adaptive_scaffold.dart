@@ -365,7 +365,7 @@ class AdaptiveScaffold extends StatelessWidget {
               ),
         ),
         selected: isSelected,
-        selectedTileColor: AppTheme.primaryColor.withOpacity(0.1),
+        selectedTileColor: AppTheme.primaryColor.withValues(alpha: 0.1),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),

@@ -76,12 +76,18 @@ dependencies:
   encrypt: ^5.0.1
   local_auth: ^2.1.8
 
-  # Development
-  flutter_lints: ^3.0.1
+  # Security
+  flutter_secure_storage: ^9.0.0
+  
+  # HTTP Client
+  dio: ^5.4.0
   
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  
+  # Linting
+  flutter_lints: ^3.0.1
   
   # Code Generation
   build_runner: ^2.4.7

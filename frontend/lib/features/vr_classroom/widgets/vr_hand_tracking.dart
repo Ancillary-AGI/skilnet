@@ -489,12 +489,12 @@ class _VRHandTrackingState extends State<VRHandTracking>
       width: 50,
       height: 50,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.3),
+        color: color.withValues(alpha: 0.3),
         border: Border.all(color: color, width: 2),
         borderRadius: BorderRadius.circular(25),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.5),
+            color: color.withValues(alpha: 0.5),
             blurRadius: 10,
             spreadRadius: 2,
           ),
@@ -558,12 +558,12 @@ class _VRHandTrackingState extends State<VRHandTracking>
       width: 80,
       height: 80,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.2),
+        color: color.withValues(alpha: 0.2),
         border: Border.all(color: color, width: 3),
         borderRadius: BorderRadius.circular(40),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.6),
+            color: color.withValues(alpha: 0.6),
             blurRadius: 15,
             spreadRadius: 3,
           ),
@@ -600,7 +600,7 @@ class GestureTrailPainter extends CustomPainter {
     if (points.length < 2) return;
 
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.6)
+      ..color = Colors.white.withValues(alpha: 0.6)
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round
       ..style = PaintingStyle.stroke;

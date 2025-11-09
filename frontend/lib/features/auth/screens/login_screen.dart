@@ -155,7 +155,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppTheme.successColor ?? Colors.green,
+        backgroundColor: AppTheme.successColor,
       ),
     );
   }

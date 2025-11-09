@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'core/app_config.dart';
 import 'core/router/app_router.dart';
-import 'core/services/api_service.dart';
-import 'core/services/auth_service.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
@@ -78,9 +76,8 @@ class EduVerseApp extends ConsumerWidget {
         final mediaQuery = MediaQuery.of(context);
         final scaledChild = MediaQuery(
           data: mediaQuery.copyWith(
-            textScaler: TextScaler.linear(
-              mediaQuery.textScaleFactor.clamp(0.8, 1.2),
-            ),
+            textScaler: mediaQuery.textScaler
+                .clamp(minScaleFactor: 0.8, maxScaleFactor: 1.2),
           ),
           child: child ?? const SizedBox.shrink(),
         );

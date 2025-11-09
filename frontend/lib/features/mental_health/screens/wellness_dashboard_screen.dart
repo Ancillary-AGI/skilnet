@@ -120,7 +120,7 @@ class _WellnessDashboardScreenState
                             Container(
                               padding: const EdgeInsets.all(AppTheme.spacing2),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius:
                                     BorderRadius.circular(AppTheme.radiusSmall),
                               ),
@@ -151,7 +151,7 @@ class _WellnessDashboardScreenState
                                         .textTheme
                                         .bodyMedium
                                         ?.copyWith(
-                                          color: Colors.white.withOpacity(0.9),
+                                          color: Colors.white.withValues(alpha: 0.9),
                                         ),
                                   ),
                                 ],
@@ -298,9 +298,9 @@ class _WellnessDashboardScreenState
           vertical: AppTheme.spacing2,
         ),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha: 0.1),
           borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
-          border: Border.all(color: color.withOpacity(0.3)),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -395,7 +395,7 @@ class _WellnessDashboardScreenState
               progress: percentage,
               size: 60,
               strokeWidth: 6,
-              backgroundColor: color.withOpacity(0.2),
+              backgroundColor: color.withValues(alpha: 0.2),
               progressColor: color,
               child: Icon(
                 icon,
@@ -507,7 +507,7 @@ class _WellnessDashboardScreenState
             Container(
               padding: const EdgeInsets.all(AppTheme.spacing3),
               decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
+                color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppTheme.radiusMedium),
               ),
               child: Icon(
@@ -651,7 +651,7 @@ class _WellnessDashboardScreenState
             Container(
               padding: const EdgeInsets.all(AppTheme.spacing3),
               decoration: BoxDecoration(
-                color: AppTheme.primaryColor.withOpacity(0.1),
+                color: AppTheme.primaryColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(AppTheme.radiusSmall),
               ),
               child: Row(

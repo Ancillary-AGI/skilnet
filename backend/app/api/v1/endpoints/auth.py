@@ -23,7 +23,7 @@ from app.schemas.auth import (
 )
 from app.services.auth_service import AuthService
 from app.services.email_service import EmailService
-from app.core.security import get_current_user
+from app.core.security import get_current_user as get_current_user_security
 
 router = APIRouter()
 security = HTTPBearer()
@@ -159,6 +159,31 @@ async def refresh_token(
             detail=f"Token refresh failed: {str(e)}"
         )
 
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: AsyncSession = Depends(get_db)
+) -> User:
+    """Dependency to get current authenticated user"""
+    auth_service = AuthService(db)
+
+    try:
+        # Validate access token
+        user = await auth_service.validate_access_token(credentials.credentials)
+
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or inactive user"
+            )
+
+        return user
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Authentication failed: {str(e)}"
+        )
+
 @router.post("/logout")
 async def logout(
     response: Response,
@@ -167,16 +192,16 @@ async def logout(
 ):
     """User logout"""
     auth_service = AuthService(db)
-    
+
     try:
         # Invalidate refresh token
         await auth_service.invalidate_user_tokens(current_user.id)
-        
+
         # Clear refresh token cookie
         response.delete_cookie("refresh_token")
-        
+
         return {"message": "Successfully logged out"}
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -276,31 +301,6 @@ async def verify_email(
             detail=f"Email verification failed: {str(e)}"
         )
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
-) -> User:
-    """Dependency to get current authenticated user"""
-    auth_service = AuthService(db)
-    
-    try:
-        # Validate access token
-        user = await auth_service.validate_access_token(credentials.credentials)
-        
-        if not user or not user.is_active:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid or inactive user"
-            )
-        
-        return user
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Authentication failed: {str(e)}"
-        )
-
 # Optional dependency for endpoints that work with or without authentication
 async def get_current_user_optional(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
@@ -386,10 +386,17 @@ async def authenticate_passkey(
         # For now, we'll need to get it from the credential data or store it temporarily
         # This is a simplified implementation
 
-        # For this demo, we'll assume the email is passed in the request
-        # In production, you'd need to handle this differently
+        # Extract email from the request or credential data
+        # In production, you might store email in a temporary session or pass it differently
+        email = credential_data.email if hasattr(credential_data, 'email') else None
+        if not email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email is required for passkey authentication"
+            )
+
         user = await auth_service.authenticate_passkey(
-            "user@example.com",  # This should be extracted properly
+            email,
             credential_data.credential.dict()
         )
 
