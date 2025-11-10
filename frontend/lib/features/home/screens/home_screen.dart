@@ -3,8 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/services/api_service.dart';
-import '../../../core/providers/app_providers.dart' as app;
 import '../../auth/providers/auth_provider.dart' as auth;
+import '../../onboarding/widgets/in_app_walkthrough.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -48,7 +48,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(auth.authProvider);
-    final apiService = ref.watch(app.apiServiceProvider);
 
     if (_isLoading) {
       return const Scaffold(
@@ -58,127 +57,130 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                gradient: AppTheme.primaryGradient,
-                borderRadius: BorderRadius.circular(12),
+    return InAppWalkthrough(
+      child: Scaffold(
+        appBar: AppBar(
+          title: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  gradient: AppTheme.primaryGradient,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.school,
+                  color: Colors.white,
+                  size: 24,
+                ),
               ),
-              child: const Icon(
-                Icons.school,
-                color: Colors.white,
-                size: 24,
+              const SizedBox(width: 12),
+              const Text(
+                'EduVerse',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.w700,
+                  fontFamily: 'Inter',
+                ),
               ),
+            ],
+          ),
+          elevation: 0,
+          backgroundColor: Colors.transparent,
+          foregroundColor: Theme.of(context).colorScheme.onSurface,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.notifications_outlined),
+              onPressed: () {
+                _showSnackBar('Notifications feature coming soon!');
+              },
             ),
-            const SizedBox(width: 12),
-            const Text(
-              'EduVerse',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Inter',
-              ),
+            IconButton(
+              icon: const Icon(Icons.person_outline),
+              onPressed: () {
+                Navigator.of(context).pushNamed('/settings');
+              },
             ),
           ],
         ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: Theme.of(context).colorScheme.onSurface,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              _showSnackBar('Notifications feature coming soon!');
-            },
-          ),
-          IconButton(
-            icon: const Icon(Icons.person_outline),
-            onPressed: () {
-              Navigator.of(context).pushNamed('/settings');
-            },
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Section
-              _buildWelcomeSection(authState),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Welcome Section
+                _buildWelcomeSection(authState),
 
-              SizedBox(height: AppTheme.spacing6),
+                SizedBox(height: AppTheme.spacing6),
 
-              // Quick Actions
-              Text(
-                'Quick Actions',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                // Quick Actions
+                Text(
+                  'Quick Actions',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                SizedBox(height: AppTheme.spacing4),
+
+                _buildQuickActions(),
+
+                SizedBox(height: AppTheme.spacing6),
+
+                // Featured Courses
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Featured Courses',
+                      style:
+                          Theme.of(context).textTheme.headlineSmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
                     ),
-              ),
-              SizedBox(height: AppTheme.spacing4),
-
-              _buildQuickActions(),
-
-              SizedBox(height: AppTheme.spacing6),
-
-              // Featured Courses
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Featured Courses',
-                    style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      _showSnackBar('Course catalog coming soon!');
-                    },
-                    child: const Text('View All'),
-                  ),
-                ],
-              ),
-              SizedBox(height: AppTheme.spacing4),
-
-              // Course Cards
-              _buildCourseCards(),
-
-              SizedBox(height: AppTheme.spacing6),
-
-              // Daily Challenge
-              _buildDailyChallenge(),
-
-              SizedBox(height: AppTheme.spacing6),
-
-              // Recent Activity
-              Text(
-                'Recent Activity',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
+                    TextButton(
+                      onPressed: () {
+                        _showSnackBar('Course catalog coming soon!');
+                      },
+                      child: const Text('View All'),
                     ),
-              ),
-              SizedBox(height: AppTheme.spacing4),
+                  ],
+                ),
+                SizedBox(height: AppTheme.spacing4),
 
-              _buildRecentActivity(),
-            ],
+                // Course Cards
+                _buildCourseCards(),
+
+                SizedBox(height: AppTheme.spacing6),
+
+                // Daily Challenge
+                _buildDailyChallenge(),
+
+                SizedBox(height: AppTheme.spacing6),
+
+                // Recent Activity
+                Text(
+                  'Recent Activity',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                SizedBox(height: AppTheme.spacing4),
+
+                _buildRecentActivity(),
+              ],
+            ),
           ),
         ),
-      ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          _showSnackBar('AI Tutor feature coming soon!');
-        },
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        label: const Text('AI Tutor'),
-        icon: const Icon(Icons.psychology),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            _showSnackBar('AI Tutor feature coming soon!');
+          },
+          backgroundColor: Theme.of(context).colorScheme.primary,
+          label: const Text('AI Tutor'),
+          icon: const Icon(Icons.psychology),
+        ),
       ),
     );
   }
@@ -214,7 +216,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha: 0.2),
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Row(
@@ -301,9 +303,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         color: Theme.of(context)
             .colorScheme
             .surfaceContainerHighest
-            .withOpacity(0.5),
+            .withValues(alpha: 0.5),
         borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: AppTheme.warningColor.withOpacity(0.3)),
+        border: Border.all(color: AppTheme.warningColor.withValues(alpha: 0.3)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -597,7 +599,7 @@ class _ActivityItem extends StatelessWidget {
           width: 40,
           height: 40,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(

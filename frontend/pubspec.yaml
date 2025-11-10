@@ -78,7 +78,10 @@ dependencies:
 
   # Security
   flutter_secure_storage: ^9.0.0
-  
+
+  # Permissions
+  permission_handler: ^11.3.0
+
   # HTTP Client
   dio: ^5.4.0
   
