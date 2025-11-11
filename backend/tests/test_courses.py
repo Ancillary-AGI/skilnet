@@ -31,8 +31,7 @@ class TestCourseService:
         user_data = UserRegister(
             email="instructor@example.com",
             username="testinstructor",
-            first_name="Test",
-            last_name="Instructor",
+            full_name="Test Instructor",
             password="TestPassword123"
         )
         instructor = await auth_service.create_user(user_data)
@@ -79,8 +78,7 @@ class TestCourseService:
         user_data = UserRegister(
             email="instructor2@example.com",
             username="testinstructor2",
-            first_name="Test",
-            last_name="Instructor 2",
+            full_name="Test Instructor 2",
             password="TestPassword123"
         )
         instructor = await auth_service.create_user(user_data)
@@ -118,8 +116,7 @@ class TestCourseService:
         user_data = UserRegister(
             email="instructor3@example.com",
             username="testinstructor3",
-            first_name="Test",
-            last_name="Instructor 3",
+            full_name="Test Instructor 3",
             password="TestPassword123"
         )
         instructor = await auth_service.create_user(user_data)
@@ -187,8 +184,7 @@ class TestCourseService:
         user_data = UserRegister(
             email="instructor4@example.com",
             username="testinstructor4",
-            first_name="Test",
-            last_name="Instructor 4",
+            full_name="Test Instructor 4",
             password="TestPassword123"
         )
         instructor = await auth_service.create_user(user_data)
@@ -229,8 +225,7 @@ class TestCourseService:
         user_data = UserRegister(
             email="instructor5@example.com",
             username="testinstructor5",
-            first_name="Test",
-            last_name="Instructor 5",
+            full_name="Test Instructor 5",
             password="TestPassword123"
         )
         instructor = await auth_service.create_user(user_data)
