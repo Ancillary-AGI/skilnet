@@ -315,10 +315,10 @@ class AuthService:
                 return None
             
             # Get user
-            user_id = payload.get("user_id")
+            user_id = payload.get("sub")
             if not user_id:
                 return None
-            
+
             user = await self.get_user_by_id(user_id)
             return user
             

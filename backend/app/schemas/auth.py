@@ -185,6 +185,7 @@ class PasskeyAuthenticationChallenge(BaseModel):
 
 class PasskeyAuthenticationConfirm(BaseModel):
     """Passkey authentication confirmation schema"""
+    email: str = Field(..., description="User email")
     credential: PasskeyCredential = Field(..., description="Passkey credential")
     challenge: str = Field(..., description="Original challenge")
 

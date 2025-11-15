@@ -386,14 +386,8 @@ async def authenticate_passkey(
         # For now, we'll need to get it from the credential data or store it temporarily
         # This is a simplified implementation
 
-        # Extract email from the request or credential data
-        # In production, you might store email in a temporary session or pass it differently
-        email = credential_data.email if hasattr(credential_data, 'email') else None
-        if not email:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Email is required for passkey authentication"
-            )
+        # Extract email from the request
+        email = credential_data.email
 
         user = await auth_service.authenticate_passkey(
             email,
