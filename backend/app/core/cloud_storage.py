@@ -7,11 +7,13 @@ import os
 import aiofiles
 import asyncio
 from abc import ABC, abstractmethod
-from typing import Optional, List, Dict, Any, BinaryIO
-from pathlib import Path
-from enum import Enum
-import mimetypes
 from datetime import datetime, timedelta
+from enum import Enum
+from importlib import import_module
+from importlib.util import find_spec
+import mimetypes
+from pathlib import Path
+from typing import Optional, List, Dict, Any, BinaryIO
 import uuid
 
 from app.core.logging import get_logger
@@ -206,6 +208,10 @@ class LocalStorageService(BaseStorageService):
         return full_path.exists()
 
 
+_aioboto3_spec = find_spec("aioboto3")
+_aioboto3_module = import_module("aioboto3") if _aioboto3_spec else None
+
+
 class AWSS3StorageService(BaseStorageService):
     """AWS S3 storage service"""
     
@@ -217,18 +223,16 @@ class AWSS3StorageService(BaseStorageService):
     async def _get_s3_client(self):
         """Get S3 client (lazy initialization)"""
         if self._s3_client is None:
-            try:
-                import aioboto3
-                
-                session = aioboto3.Session()
-                self._s3_client = session.client(
-                    's3',
-                    aws_access_key_id=self.config.AWS_ACCESS_KEY_ID,
-                    aws_secret_access_key=self.config.AWS_SECRET_ACCESS_KEY,
-                    region_name=self.config.AWS_REGION
-                )
-            except ImportError:
+            if _aioboto3_module is None:
                 raise ImportError("aioboto3 is required for AWS S3 storage")
+            
+            session = _aioboto3_module.Session()
+            self._s3_client = session.client(
+                's3',
+                aws_access_key_id=self.config.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=self.config.AWS_SECRET_ACCESS_KEY,
+                region_name=self.config.AWS_REGION
+            )
         
         return self._s3_client
     

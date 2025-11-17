@@ -4,6 +4,8 @@ Test file structure and basic imports for EduVerse API
 
 import os
 import sys
+from importlib import import_module
+from importlib.util import find_spec
 
 def test_file_structure():
     """Test that required files exist"""
@@ -65,12 +67,13 @@ def test_imports():
     success_count = 0
     
     for module_name, description in modules_to_test:
-        try:
-            __import__(module_name)
-            print(f"✅ IMPORT - {description}: {module_name}")
-            success_count += 1
-        except ImportError:
+        if find_spec(module_name) is None:
             print(f"❌ MISSING - {description}: {module_name}")
+            continue
+        
+        import_module(module_name)
+        print(f"✅ IMPORT - {description}: {module_name}")
+        success_count += 1
     
     print(f"\n📊 Import Summary: {success_count}/{len(modules_to_test)} modules imported")
     return success_count == len(modules_to_test)

@@ -6,6 +6,11 @@ import os
 from enum import Enum
 from typing import Optional, Dict, Any
 
+from sqlalchemy import create_engine
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.pool import StaticPool
+
 # Simple fallback for BaseSettings if pydantic is not available
 class BaseSettings:
     class Config:
@@ -15,10 +20,6 @@ class BaseSettings:
     def __init__(self, **kwargs):
         for key, value in kwargs.items():
             setattr(self, key, value)
-from sqlalchemy import create_engine
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
-from sqlalchemy.orm import sessionmaker, declarative_base
-from sqlalchemy.pool import StaticPool
 
 class DatabaseType(str, Enum):
     SQLITE = "sqlite"
@@ -30,7 +31,7 @@ class DatabaseConfig(BaseSettings):
     """Database configuration with environment variable support"""
     
     # Database type selection
-    DB_TYPE: DatabaseType = DatabaseType.POSTGRESQL
+    DB_TYPE: DatabaseType = DatabaseType.SQLITE
     
     # PostgreSQL settings (default/recommended)
     POSTGRES_HOST: str = "localhost"
@@ -144,10 +145,15 @@ class DatabaseConfig(BaseSettings):
             )
         return f"mongodb://{self.MONGODB_HOST}:{self.MONGODB_PORT}/{self.MONGODB_DB}"
     
+    @property
+    def is_sqlite(self) -> bool:
+        """Check if using SQLite database"""
+        return self.DB_TYPE == DatabaseType.SQLITE
+
     def get_engine_kwargs(self) -> Dict[str, Any]:
         """Get engine-specific kwargs"""
         kwargs = {}
-        
+
         # SQLite specific settings
         if self.DB_TYPE == DatabaseType.SQLITE:
             kwargs.update({
@@ -162,24 +168,24 @@ class DatabaseConfig(BaseSettings):
                 "pool_timeout": self.DB_POOL_TIMEOUT,
                 "pool_recycle": self.DB_POOL_RECYCLE,
             })
-        
+
         # SSL settings for cloud databases
         if self.DB_TYPE in [DatabaseType.POSTGRESQL, DatabaseType.MYSQL]:
             connect_args = kwargs.get("connect_args", {})
-            
+
             if self.DB_SSL_MODE != "disable":
                 connect_args["sslmode"] = self.DB_SSL_MODE
-                
+
                 if self.DB_SSL_CERT:
                     connect_args["sslcert"] = self.DB_SSL_CERT
                 if self.DB_SSL_KEY:
                     connect_args["sslkey"] = self.DB_SSL_KEY
                 if self.DB_SSL_CA:
                     connect_args["sslrootcert"] = self.DB_SSL_CA
-            
+
             if connect_args:
                 kwargs["connect_args"] = connect_args
-        
+
         return kwargs
 
 # Global database configuration

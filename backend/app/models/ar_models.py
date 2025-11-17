@@ -1,5 +1,5 @@
 from .base_model import BaseModel
-from ..core.database import Field
+from app.core.database import Field
 from enum import Enum
 import uuid
 

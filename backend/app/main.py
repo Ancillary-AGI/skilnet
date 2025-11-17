@@ -13,27 +13,13 @@ from pathlib import Path
 import os
 
 # Import core modules
-try:
-    from app.core.config import settings
-    from app.core.logging import setup_logging
-    from app.api.v1.api import api_router
-    from app.services.initialization_service import startup_initialization, system_health_check
-    
-    # Setup logging
-    setup_logging()
-    
-    IMPORTS_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Some imports failed: {e}")
-    IMPORTS_AVAILABLE = False
-    
-    # Mock settings for testing
-    class MockSettings:
-        APP_NAME = "EduVerse"
-        DEBUG = True
-        VERSION = "2.0.0"
-    
-    settings = MockSettings()
+from app.core.config import settings
+from app.core.logging import setup_logging
+from app.api.v1.api import api_router
+from app.services.initialization_service import startup_initialization, system_health_check
+
+# Setup logging
+setup_logging()
 
 # Security scheme
 security = HTTPBearer()
@@ -43,14 +29,13 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     print("🚀 Starting EduVerse API...")
-    
-    if IMPORTS_AVAILABLE:
-        # Initialize all systems
-        init_status = await startup_initialization()
-        print(f"📊 Initialization Status: {init_status['status']}")
-    
+
+    # Initialize all systems
+    init_status = await startup_initialization()
+    print(f"📊 Initialization Status: {init_status['status']}")
+
     yield
-    
+
     # Shutdown
     print("🔄 Shutting down EduVerse API...")
 
@@ -135,7 +120,7 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
     openapi_url="/openapi.json",
-    lifespan=lifespan if IMPORTS_AVAILABLE else None
+    lifespan=lifespan
 )
 
 # CORS middleware for cross-origin requests
@@ -147,31 +132,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include API routers if available
-if IMPORTS_AVAILABLE:
-    app.include_router(api_router, prefix="/api/v1")
+# Include API routers
+app.include_router(api_router, prefix="/api/v1")
 
 # Health check endpoints
 @app.get("/health", tags=["Health"])
 async def health_check():
     """Basic health check endpoint"""
+    from datetime import datetime
     return {
         "status": "healthy",
         "service": "EduVerse API",
         "version": "2.0.0",
-        "timestamp": "2024-01-15T10:30:00Z"
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
 @app.get("/health/database", tags=["Health"])
 async def database_health_check():
     """Database health check"""
-    if not IMPORTS_AVAILABLE:
-        return {
-            "status": "testing",
-            "database": "mocked",
-            "service": "EduVerse API"
-        }
-    
     try:
         # Test database connection
         from app.core.database import AsyncSessionLocal
@@ -192,26 +170,8 @@ async def database_health_check():
 @app.get("/health/complete", tags=["Health"])
 async def complete_health_check():
     """Comprehensive health check"""
-    if not IMPORTS_AVAILABLE:
-        return {
-            "status": "testing",
-            "service": "EduVerse API",
-            "version": "2.0.0",
-            "components": {"database": "mocked", "api": "healthy"},
-            "features": {
-                "authentication": "mocked",
-                "social_login": "mocked",
-                "real_time": "mocked",
-                "ai_powered": "mocked",
-                "vr_ar": "mocked",
-                "auto_updates": "mocked",
-                "cloud_storage": "mocked"
-            },
-            "timestamp": "2024-01-15T10:30:00Z"
-        }
-    
     health_status = await system_health_check()
-    
+
     return {
         "status": health_status["overall"],
         "service": "EduVerse API",

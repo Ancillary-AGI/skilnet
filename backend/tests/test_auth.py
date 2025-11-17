@@ -16,79 +16,98 @@ class TestAuthService:
     """Test authentication service methods"""
 
     @pytest.mark.asyncio
-    async def test_create_user(self, db_session: AsyncSession):
+    async def test_create_user(self):
         """Test user creation"""
         # Ensure database is set up
-        from app.core.database import init_database, create_tables
+        from app.core.database import init_database, create_tables, get_db
         await init_database()
         await create_tables()
 
-        auth_service = AuthService(db_session)
+        async for db in get_db():
+            auth_service = AuthService(db)
 
-        user_data = UserRegister(
-            email="test@example.com",
-            username="testuser",
-            full_name="Test User",
-            password="TestPassword123"
-        )
+            import uuid
+            unique_id = str(uuid.uuid4())[:8]
 
-        user = await auth_service.create_user(user_data)
+            user_data = UserRegister(
+                email=f"test_{unique_id}@example.com",
+                username=f"testuser{unique_id}",
+                full_name="Test User",
+                password="TestPassword123"
+            )
 
-        assert user.email == "test@example.com"
-        assert user.full_name == "Test User"
-        assert user.is_active == True
-        assert user.is_verified == False
+            user = await auth_service.create_user(user_data)
+
+            assert user.email == user_data.email
+            assert user.full_name == "Test User"
+            assert user.is_active == True
+            assert user.is_verified == False
+            break
 
     @pytest.mark.asyncio
-    async def test_authenticate_user(self, db_session: AsyncSession):
+    async def test_authenticate_user(self):
         """Test user authentication"""
         # Ensure database is set up
-        from app.core.database import init_database, create_tables
+        from app.core.database import init_database, create_tables, get_db
         await init_database()
         await create_tables()
 
-        auth_service = AuthService(db_session)
+        async for db in get_db():
+            auth_service = AuthService(db)
 
-        # Create user first
-        user_data = UserRegister(
-            email="auth_test@example.com",
-            username="authtestuser",
-            full_name="Auth Test User",
-            password="TestPassword123"
-        )
-        await auth_service.create_user(user_data)
+            import uuid
+            unique_id = str(uuid.uuid4())[:8]
 
-        # Test authentication
-        user = await auth_service.authenticate_user("auth_test@example.com", "TestPassword123")
-        assert user is not None
-        assert user.email == "auth_test@example.com"
+            # Create user first
+            user_data = UserRegister(
+                email=f"auth_test_{unique_id}@example.com",
+                username=f"authtestuser{unique_id}",
+                full_name="Auth Test User",
+                password="TestPassword123"
+            )
+            await auth_service.create_user(user_data)
 
-        # Test invalid password
-        user = await auth_service.authenticate_user("auth_test@example.com", "wrongpassword")
-        assert user is None
+            # Test authentication
+            user = await auth_service.authenticate_user(user_data.email, "TestPassword123")
+            assert user is not None
+            assert user.email == user_data.email
+
+            # Test invalid password
+            user = await auth_service.authenticate_user(user_data.email, "wrongpassword")
+            assert user is None
+            break
 
     @pytest.mark.asyncio
-    async def test_get_user_by_email(self, db_session: AsyncSession):
+    async def test_get_user_by_email(self):
         """Test getting user by email"""
-        auth_service = AuthService(db_session)
+        from app.core.database import init_database, create_tables, get_db
+        await init_database()
+        await create_tables()
 
-        # Create user first
-        user_data = UserRegister(
-            email="get_test@example.com",
-            username="gettestuser",
-            full_name="Get Test User",
-            password="TestPassword123"
-        )
-        created_user = await auth_service.create_user(user_data)
+        async for db in get_db():
+            auth_service = AuthService(db)
 
-        # Get user by email
-        user = await auth_service.get_user_by_email("get_test@example.com")
-        assert user is not None
-        assert user.id == created_user.id
+            import uuid
+            unique_id = str(uuid.uuid4())[:8]
 
-        # Test non-existent user
-        user = await auth_service.get_user_by_email("nonexistent@example.com")
-        assert user is None
+            # Create user first
+            user_data = UserRegister(
+                email=f"get_test_{unique_id}@example.com",
+                username=f"gettestuser{unique_id}",
+                full_name="Get Test User",
+                password="TestPassword123"
+            )
+            created_user = await auth_service.create_user(user_data)
+
+            # Get user by email
+            user = await auth_service.get_user_by_email(user_data.email)
+            assert user is not None
+            assert user.id == created_user.id
+
+            # Test non-existent user
+            user = await auth_service.get_user_by_email("nonexistent@example.com")
+            assert user is None
+            break
 
 
 class TestAuthEndpoints:
@@ -97,14 +116,12 @@ class TestAuthEndpoints:
     @pytest.mark.asyncio
     async def test_register_endpoint(self, async_client: AsyncClient):
         """Test user registration endpoint"""
-        # Ensure database is set up for endpoint tests
-        from app.core.database import init_database, create_tables
-        await init_database()
-        await create_tables()
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
 
         user_data = {
-            "email": "endpoint_test@example.com",
-            "username": "endpointtestuser",
+            "email": f"endpoint_test_{unique_id}@example.com",
+            "username": f"endpointtestuser{unique_id}",
             "full_name": "Endpoint Test User",
             "password": "TestPassword123"
         }
@@ -116,16 +133,19 @@ class TestAuthEndpoints:
         assert response.status_code == 200
 
         data = response.json()
-        assert data["email"] == "endpoint_test@example.com"
+        assert data["email"] == user_data["email"]
         assert data["full_name"] == "Endpoint Test User"
 
     @pytest.mark.asyncio
     async def test_login_endpoint(self, async_client: AsyncClient):
         """Test user login endpoint"""
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
+
         # Register user first
         user_data = {
-            "email": "login_test@example.com",
-            "username": "logintestuser",
+            "email": f"login_test_{unique_id}@example.com",
+            "username": f"logintestuser{unique_id}",
             "full_name": "Login Test User",
             "password": "TestPassword123"
         }
@@ -133,7 +153,7 @@ class TestAuthEndpoints:
 
         # Test login
         login_data = {
-            "email": "login_test@example.com",
+            "email": user_data["email"],
             "password": "TestPassword123"
         }
 
@@ -160,9 +180,12 @@ class TestAuthEndpoints:
     @pytest.mark.asyncio
     async def test_register_duplicate_email(self, async_client: AsyncClient):
         """Test registering with duplicate email"""
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
+
         user_data = {
-            "email": "duplicate@example.com",
-            "username": "duplicatetestuser",
+            "email": f"duplicate_{unique_id}@example.com",
+            "username": f"duplicatetestuser{unique_id}",
             "full_name": "Duplicate Test User",
             "password": "TestPassword123"
         }
@@ -206,10 +229,13 @@ class TestAuthIntegration:
     @pytest.mark.asyncio
     async def test_complete_auth_flow(self, async_client: AsyncClient):
         """Test complete authentication flow"""
+        import uuid
+        unique_id = str(uuid.uuid4())[:8]
+
         # 1. Register user
         user_data = {
-            "email": "flow_test@example.com",
-            "username": "flowtestuser",
+            "email": f"flow_test_{unique_id}@example.com",
+            "username": f"flowtestuser{unique_id}",
             "full_name": "Flow Test User",
             "password": "TestPassword123"
         }
@@ -219,7 +245,7 @@ class TestAuthIntegration:
 
         # 2. Login
         login_data = {
-            "email": "flow_test@example.com",
+            "email": user_data["email"],
             "password": "TestPassword123"
         }
 
@@ -234,8 +260,8 @@ class TestAuthIntegration:
         me_response = await async_client.get("/api/v1/auth/me", headers=headers)
         assert me_response.status_code == 200
 
-        user_data = me_response.json()
-        assert user_data["email"] == "flow_test@example.com"
+        user_data_response = me_response.json()
+        assert user_data_response["email"] == user_data["email"]
 
     @pytest.mark.asyncio
     async def test_password_validation(self, async_client: AsyncClient):

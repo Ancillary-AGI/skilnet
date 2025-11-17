@@ -2,17 +2,135 @@
 Database module with flexible backend support and cloud storage integration
 """
 
+from importlib import import_module
+from importlib.util import find_spec
+from typing import AsyncGenerator, Dict, Any, Optional, Union
+
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import AsyncGenerator
+
 from .database_config import (
     Base, async_engine, AsyncSessionLocal, get_db, create_tables, drop_tables,
     db_config, DatabaseType
 )
 
+
+class Field:
+    """Database field definition for custom ORM"""
+
+    def __init__(
+        self,
+        field_type: str,
+        primary_key: bool = False,
+        nullable: bool = True,
+        default: Any = None,
+        index: bool = False,
+        unique: bool = False,
+        autoincrement: bool = False
+    ):
+        self.field_type = field_type.upper()
+        self.primary_key = primary_key
+        self.nullable = nullable
+        self.default = default
+        self.index = index
+        self.unique = unique
+        self.autoincrement = autoincrement
+
+    def sql_definition(self, name: str, is_sqlite: bool = False) -> str:
+        """Generate SQL column definition"""
+        parts = [name]
+
+        # Field type
+        if self.field_type == 'INTEGER':
+            parts.append('INTEGER')
+        elif self.field_type == 'REAL':
+            parts.append('REAL')
+        elif self.field_type == 'TEXT':
+            parts.append('TEXT')
+        elif self.field_type == 'BOOLEAN':
+            parts.append('BOOLEAN')
+        elif self.field_type == 'TIMESTAMP':
+            parts.append('TIMESTAMP')
+        elif self.field_type == 'JSON':
+            parts.append('TEXT')  # SQLite doesn't have JSON, use TEXT
+        else:
+            parts.append(self.field_type)
+
+        # Primary key
+        if self.primary_key:
+            parts.append('PRIMARY KEY')
+
+        # Autoincrement
+        if self.autoincrement and self.field_type == 'INTEGER':
+            if is_sqlite:
+                parts.append('AUTOINCREMENT')
+            else:
+                parts.append('AUTO_INCREMENT')
+
+        # Not null
+        if not self.nullable:
+            parts.append('NOT NULL')
+
+        # Unique
+        if self.unique:
+            parts.append('UNIQUE')
+
+        # Default
+        if self.default is not None:
+            if callable(self.default):
+                # For functions like CURRENT_TIMESTAMP
+                if self.default.__name__ == 'CURRENT_TIMESTAMP':
+                    parts.append('DEFAULT CURRENT_TIMESTAMP')
+            elif isinstance(self.default, str):
+                parts.append(f"DEFAULT '{self.default}'")
+            else:
+                parts.append(f"DEFAULT {self.default}")
+
+        return ' '.join(parts)
+
+
+class DatabaseConnection:
+    """Database connection manager singleton"""
+
+    _instance = None
+    _initialized = False
+
+    def __init__(self, config):
+        if DatabaseConnection._instance is not None:
+            raise Exception("DatabaseConnection is a singleton class")
+
+        self.config = config
+        self._connection = None
+        DatabaseConnection._instance = self
+
+    @classmethod
+    def get_instance(cls, config=None):
+        """Get singleton instance"""
+        if cls._instance is None:
+            if config is None:
+                raise Exception("DatabaseConnection not initialized")
+            cls._instance = cls(config)
+        return cls._instance
+
+    async def get_connection(self):
+        """Get database connection"""
+        if self.config.DB_TYPE == DatabaseType.SQLITE:
+            # For SQLite, return the session
+            return AsyncSessionLocal()
+        else:
+            # For other databases, return the async session
+            return AsyncSessionLocal()
+
+    async def close(self):
+        """Close database connection"""
+        if self._connection:
+            await self._connection.close()
+            self._connection = None
+
 # Re-export for backward compatibility
 __all__ = [
-    "Base", "async_engine", "AsyncSessionLocal", "get_db", 
-    "create_tables", "drop_tables", "db_config", "DatabaseType"
+    "Base", "async_engine", "AsyncSessionLocal", "get_db",
+    "create_tables", "drop_tables", "db_config", "DatabaseType",
+    "Field", "DatabaseConnection"
 ]
 
 # Database utilities
@@ -58,43 +176,37 @@ def get_database_info():
     }
 
 # MongoDB support (if needed)
-try:
-    from motor.motor_asyncio import AsyncIOMotorClient
-    from pymongo.errors import ConnectionFailure
+from motor.motor_asyncio import AsyncIOMotorClient
+from pymongo.errors import ConnectionFailure
+
+class MongoDatabase:
+    def __init__(self):
+        self.client = None
+        self.database = None
     
-    class MongoDatabase:
-        def __init__(self):
-            self.client = None
-            self.database = None
-        
-        async def connect(self):
-            """Connect to MongoDB"""
-            if db_config.DB_TYPE == DatabaseType.MONGODB:
-                self.client = AsyncIOMotorClient(db_config.get_database_url())
-                self.database = self.client[db_config.MONGODB_DB]
-                
-                # Test connection
-                await self.client.admin.command('ping')
-                print("✅ MongoDB connected successfully")
-        
-        async def disconnect(self):
-            """Disconnect from MongoDB"""
-            if self.client:
-                self.client.close()
-        
-        def get_collection(self, name: str):
-            """Get MongoDB collection"""
-            if self.database:
-                return self.database[name]
-            return None
+    async def connect(self):
+        """Connect to MongoDB"""
+        if db_config.DB_TYPE == DatabaseType.MONGODB:
+            self.client = AsyncIOMotorClient(db_config.get_database_url())
+            self.database = self.client[db_config.MONGODB_DB]
+            
+            # Test connection
+            await self.client.admin.command('ping')
+            print("✅ MongoDB connected successfully")
     
-    # Global MongoDB instance
-    mongo_db = MongoDatabase()
+    async def disconnect(self):
+        """Disconnect from MongoDB"""
+        if self.client:
+            self.client.close()
     
-except ImportError:
-    # MongoDB dependencies not installed
-    mongo_db = None
-    print("💡 MongoDB support not available (install motor and pymongo)")
+    def get_collection(self, name: str):
+        """Get MongoDB collection"""
+        if self.database:
+            return self.database[name]
+        return None
+
+# Global MongoDB instance
+mongo_db = MongoDatabase()
 
 # Database migration utilities
 class DatabaseMigration:

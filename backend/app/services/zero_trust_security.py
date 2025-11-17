@@ -25,6 +25,10 @@ import jwt
 from passlib.context import CryptContext
 import redis.asyncio as redis
 
+# Import application services
+from app.services.auth_service import AuthService
+from app.core.database import get_db
+
 logger = logging.getLogger(__name__)
 
 
@@ -496,18 +500,19 @@ class ZeroTrustSecurityEngine:
 
     async def _verify_credentials(self, username: str, password: str) -> Optional[Dict[str, Any]]:
         """Verify user credentials"""
+        async for db in get_db():
+            auth_service = AuthService(db)
+            user = await auth_service.authenticate_user(username, password)
 
-        # In production, this would query the database
-        # For now, return mock user data
-        if username == "admin" and password == "secure_password":
-            return {
-                "user_id": "user_123",
-                "username": username,
-                "role": "admin",
-                "permissions": ["read", "write", "admin"],
-                "mfa_enabled": True
-            }
-        return None
+            if user:
+                return {
+                    "user_id": user.id,
+                    "username": user.username or user.email,
+                    "role": getattr(user, 'role', 'user'),
+                    "permissions": getattr(user, 'permissions', ["read"]),
+                    "mfa_enabled": getattr(user, 'mfa_enabled', False)
+                }
+            return None
 
     async def _generate_device_fingerprint(self, device_info: Optional[Dict[str, Any]]) -> str:
         """Generate device fingerprint for security"""
@@ -552,20 +557,43 @@ class ZeroTrustSecurityEngine:
 
     async def _analyze_behavioral_patterns(self, user_id: str) -> float:
         """Analyze user behavioral patterns for risk assessment"""
+        # Analyze login patterns, access times, and frequency
+        # This is a basic implementation - in production, use ML models
+        risk_score = 0.0
 
-        # In production, this would use ML models to detect anomalous behavior
-        # For now, return mock risk score
-        return 0.1  # Low risk
+        # Check login frequency (simplified)
+        if user_id in self.user_contexts:
+            context = self.user_contexts[user_id]
+            # Higher risk for very frequent logins
+            if len(context.suspicious_activities) > 5:
+                risk_score += 0.3
+
+        return min(risk_score, 1.0)
 
     async def _assess_location_risk(self, device_info: Optional[Dict[str, Any]]) -> float:
         """Assess risk based on geographic location"""
-
         if not device_info or "ip_address" not in device_info:
             return 0.0
 
-        # In production, this would use IP geolocation and threat intelligence
-        # For now, return mock risk score
-        return 0.05  # Very low risk
+        ip_address = device_info["ip_address"]
+
+        # Basic IP validation and risk assessment
+        risk_score = 0.0
+
+        # Check if IP is private/reserved
+        try:
+            ip_obj = ipaddress.ip_address(ip_address)
+            if ip_obj.is_private or ip_obj.is_reserved:
+                risk_score += 0.1  # Slightly higher risk for private IPs
+        except ValueError:
+            risk_score += 0.3  # Invalid IP format
+
+        # Check for known suspicious patterns
+        if ip_address.startswith("10.") or ip_address.startswith("192.168."):
+            risk_score += 0.2  # Common VPN/proxy ranges
+
+        # In production, integrate with GeoIP database and threat intelligence
+        return min(risk_score, 1.0)
 
     def _get_risk_level(self, risk_score: float) -> RiskLevel:
         """Convert risk score to risk level"""
@@ -853,10 +881,28 @@ class ZeroTrustSecurityEngine:
 
     async def _detect_anomalies(self, user_id: str, activity_data: Dict[str, Any]) -> float:
         """Detect anomalous behavior"""
+        anomaly_score = 0.0
 
-        # In production, use ML models for anomaly detection
-        # For now, return mock anomaly score
-        return 0.1  # Low anomaly score
+        # Check for unusual access patterns
+        request_count = activity_data.get("request_count", 0)
+        time_window = activity_data.get("time_window_minutes", 60)
+
+        # High request frequency
+        if request_count > 100 and time_window <= 5:
+            anomaly_score += 0.4
+
+        # Unusual hours (basic check)
+        current_hour = datetime.utcnow().hour
+        if current_hour < 5 or current_hour > 23:
+            anomaly_score += 0.2
+
+        # Check for known attack patterns
+        user_agent = activity_data.get("user_agent", "")
+        if any(suspicious in user_agent.lower() for suspicious in ["bot", "crawler", "scanner"]):
+            anomaly_score += 0.3
+
+        # In production, use ML models for more sophisticated anomaly detection
+        return min(anomaly_score, 1.0)
 
     async def _analyze_behavioral_risk(self, user_id: str, activity_data: Dict[str, Any]) -> float:
         """Analyze behavioral risk patterns"""
@@ -1112,10 +1158,28 @@ class ZeroTrustSecurityEngine:
 
     async def _rsa_decrypt(self, encrypted_data: bytes) -> bytes:
         """RSA decryption"""
+        try:
+            # In production, load private key from secure storage
+            # This is a simplified implementation for demonstration
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=2048
+            )
 
-        # In production, load private key securely
-        # For now, return mock decrypted data
-        return b"decrypted_data"
+            # Decrypt data
+            decrypted = private_key.decrypt(
+                encrypted_data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                    algorithm=hashes.SHA256(),
+                    label=None
+                )
+            )
+
+            return decrypted
+        except Exception as e:
+            logger.error(f"RSA decryption failed: {e}")
+            raise ValueError("Failed to decrypt data with RSA")
 
     async def _aes_encrypt(self, data: bytes) -> bytes:
         """AES encryption for standard security"""

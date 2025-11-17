@@ -30,36 +30,33 @@ class EmailService:
         )
     
     @log_performance
-    async def send_welcome_email(self, user: User) -> bool:
+    async def send_welcome_email(self, user: User, db_session=None) -> bool:
         """Send welcome email to new user"""
-        try:
-            # Generate email verification token
+        # Generate email verification token
+        if db_session:
             from app.services.auth_service import AuthService
-            # Note: In a real implementation, you'd pass the db session
-            # auth_service = AuthService(db)
-            # verification_token = auth_service.create_email_verification_token(user.id)
-            verification_token = "dummy_token_for_demo"
-            
-            verification_url = f"{settings.APP_URL}/verify-email?token={verification_token}"
-            
-            template = self.template_env.get_template("welcome.html")
-            html_content = template.render(
-                user_name=user.display_name,
-                verification_url=verification_url,
-                app_url=settings.APP_URL,
-                current_year=datetime.now().year
-            )
-            
-            return await self.send_email(
-                to_email=user.email,
-                subject="Welcome to EduVerse! 🎓",
-                html_content=html_content,
-                template_name="welcome"
-            )
-            
-        except Exception as e:
-            self.logger.error(f"Failed to send welcome email: {e}")
-            return False
+            auth_service = AuthService(db_session)
+            verification_token = auth_service.create_email_verification_token(user.id)
+        else:
+            # Fallback for when no db session is provided
+            verification_token = f"verify_{user.id}_{datetime.now().timestamp()}"
+
+        verification_url = f"{settings.APP_URL}/verify-email?token={verification_token}"
+
+        template = self.template_env.get_template("welcome.html")
+        html_content = template.render(
+            user_name=user.display_name,
+            verification_url=verification_url,
+            app_url=settings.APP_URL,
+            current_year=datetime.now().year
+        )
+
+        return await self.send_email(
+            to_email=user.email,
+            subject="Welcome to EduVerse! 🎓",
+            html_content=html_content,
+            template_name="welcome"
+        )
     
     @log_performance
     async def send_password_reset_email(self, user: User, reset_token: str) -> bool:

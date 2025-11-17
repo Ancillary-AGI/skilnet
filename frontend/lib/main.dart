@@ -7,7 +7,10 @@ import 'core/router/app_router.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/asset_cache_service.dart';
+import 'core/services/haptic_service.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/responsive_utils.dart';
 import 'core/providers/app_providers.dart';
 
 void main() async {
@@ -16,12 +19,16 @@ void main() async {
   // Initialize Hive for local storage
   await Hive.initFlutter();
 
-  // Initialize services
+  // Initialize core services
   await CacheService.initialize();
   await AnalyticsService.initialize();
   await NotificationService.initialize();
 
-  // Set preferred orientations
+  // Initialize new polished services
+  await AssetCacheService.instance.initialize();
+  await AssetCacheService.instance.preloadCriticalAssets();
+
+  // Set preferred orientations for all device types
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -29,7 +36,7 @@ void main() async {
     DeviceOrientation.landscapeRight,
   ]);
 
-  // Set system UI overlay style
+  // Enhanced system UI overlay style with responsive considerations
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -38,6 +45,9 @@ void main() async {
       systemNavigationBarIconBrightness: Brightness.dark,
     ),
   );
+
+  // Enable high refresh rate displays
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
   // API service is now auto-initialized
 
@@ -70,19 +80,39 @@ class EduVerseApp extends ConsumerWidget {
       supportedLocales: AppConfig.supportedLocales,
       locale: ref.watch(localeProvider),
 
-      // Builder for responsive design and error handling
+      // Enhanced builder for responsive design, accessibility, and performance
       builder: (context, child) {
-        // Handle text scaling
         final mediaQuery = MediaQuery.of(context);
-        final scaledChild = MediaQuery(
+
+        // Enhanced text scaling with better accessibility
+        final textScaler = mediaQuery.textScaler.clamp(
+          minScaleFactor: 0.8,
+          maxScaleFactor: 1.4, // Increased for better accessibility
+        );
+
+        // Apply responsive padding and safe areas
+        final safeAreaInsets = ResponsiveUtils.getSafeAreaInsets(context);
+
+        final enhancedChild = MediaQuery(
           data: mediaQuery.copyWith(
-            textScaler: mediaQuery.textScaler
-                .clamp(minScaleFactor: 0.8, maxScaleFactor: 1.2),
+            textScaler: textScaler,
+            padding: mediaQuery.padding.copyWith(
+              left: mediaQuery.padding.left + safeAreaInsets.left,
+              top: mediaQuery.padding.top + safeAreaInsets.top,
+              right: mediaQuery.padding.right + safeAreaInsets.right,
+              bottom: mediaQuery.padding.bottom + safeAreaInsets.bottom,
+            ),
           ),
           child: child ?? const SizedBox.shrink(),
         );
 
-        return scaledChild;
+        // Add performance optimizations
+        return DefaultTextHeightBehavior(
+          textHeightBehavior: const TextHeightBehavior(
+            leadingDistribution: TextLeadingDistribution.even,
+          ),
+          child: enhancedChild,
+        );
       },
     );
   }

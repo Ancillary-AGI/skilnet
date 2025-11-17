@@ -14,10 +14,10 @@ from app.models.user import User
 from app.core.database import get_db
 
 # Password hashing
-from passlib.context import CryptContext
 import hashlib
 import secrets
 
+from passlib.context import CryptContext
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # JWT configuration
@@ -27,27 +27,11 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""
-    if hashed_password.startswith("$2b$") or hashed_password.startswith("$2a$"):
-        # Try bcrypt if available
-        try:
-            return pwd_context.verify(plain_password, hashed_password)
-        except:
-            pass
-
-    # Fallback to SHA256
-    salt = hashed_password.split(":")[0] if ":" in hashed_password else ""
-    if salt:
-        expected = hashlib.sha256((salt + plain_password).encode()).hexdigest()
-        return hashed_password == f"{salt}:{expected}"
-
-    return False
+    return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password: str) -> str:
-    """Generate password hash"""
-    # Use SHA256 with salt for now
-    salt = secrets.token_hex(16)
-    hash_obj = hashlib.sha256((salt + password).encode())
-    return f"{salt}:{hash_obj.hexdigest()}"
+    """Generate password hash using bcrypt"""
+    return pwd_context.hash(password)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""

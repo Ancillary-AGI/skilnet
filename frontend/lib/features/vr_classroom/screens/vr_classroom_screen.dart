@@ -77,7 +77,7 @@ class _VRClassroomScreenState extends ConsumerState<VRClassroomScreen>
   Widget build(BuildContext context) {
     return AdaptiveScaffold(
       currentLocation: '/vr-classroom/${widget.roomId}',
-      child: FadeTransition(
+      body: FadeTransition(
         opacity: _fadeAnimation,
         child: ScaleTransition(
           scale: _scaleAnimation,

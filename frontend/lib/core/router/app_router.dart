@@ -8,7 +8,6 @@ import 'package:eduverse/features/home/screens/home_screen.dart';
 import 'package:eduverse/features/onboarding/screens/onboarding_screen.dart';
 import 'package:eduverse/features/dashboard/screens/dashboard_screen.dart';
 import 'package:eduverse/features/courses/screens/course_catalog_screen.dart';
-import 'package:eduverse/features/courses/screens/course_detail_screen.dart';
 import 'package:eduverse/features/ai_tutor/screens/ai_tutor_screen.dart';
 import 'package:eduverse/features/vr_classroom/screens/vr_classroom_screen.dart';
 import 'package:eduverse/features/profile/screens/profile_screen.dart';

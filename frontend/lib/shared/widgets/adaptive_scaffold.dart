@@ -1,389 +1,448 @@
 import 'package:flutter/material.dart';
-import '../../core/theme/app_theme.dart';
+import 'package:flutter/gestures.dart';
+import '../../core/theme/responsive_utils.dart';
 
+/// Adaptive scaffold that adjusts layout based on device type and screen size
 class AdaptiveScaffold extends StatelessWidget {
-  final Widget child;
+  final PreferredSizeWidget? appBar;
+  final Widget body;
+  final Widget? floatingActionButton;
+  final FloatingActionButtonLocation? floatingActionButtonLocation;
+  final FloatingActionButtonAnimator? floatingActionButtonAnimator;
+  final List<Widget>? persistentFooterButtons;
+  final Widget? drawer;
+  final Widget? endDrawer;
+  final Widget? bottomNavigationBar;
+  final Widget? bottomSheet;
+  final Color? backgroundColor;
+  final bool? resizeToAvoidBottomInset;
+  final bool primary;
+  final DragStartBehavior drawerDragStartBehavior;
+  final bool extendBody;
+  final bool extendBodyBehindAppBar;
+  final Color? drawerScrimColor;
+  final double? drawerEdgeDragWidth;
+  final bool drawerEnableOpenDragGesture;
+  final bool endDrawerEnableOpenDragGesture;
+  final String? restorationId;
   final String currentLocation;
 
   const AdaptiveScaffold({
     super.key,
-    required this.child,
+    this.appBar,
+    required this.body,
+    this.floatingActionButton,
+    this.floatingActionButtonLocation,
+    this.floatingActionButtonAnimator,
+    this.persistentFooterButtons,
+    this.drawer,
+    this.endDrawer,
+    this.bottomNavigationBar,
+    this.bottomSheet,
+    this.backgroundColor,
+    this.resizeToAvoidBottomInset,
+    this.primary = true,
+    this.drawerDragStartBehavior = DragStartBehavior.start,
+    this.extendBody = false,
+    this.extendBodyBehindAppBar = false,
+    this.drawerScrimColor,
+    this.drawerEdgeDragWidth,
+    this.drawerEnableOpenDragGesture = true,
+    this.endDrawerEnableOpenDragGesture = true,
+    this.restorationId,
     required this.currentLocation,
   });
 
   @override
   Widget build(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final deviceType = ResponsiveUtils.getDeviceType(context);
+        final isLandscape =
+            MediaQuery.of(context).orientation == Orientation.landscape;
+        final screenSize = MediaQuery.of(context).size;
 
-    // Mobile layout with bottom navigation
-    if (screenWidth < 600) {
-      return Scaffold(
-        body: child,
-        bottomNavigationBar: _buildBottomNavigationBar(context),
-      );
-    }
+        // Adaptive layout logic
+        Widget scaffoldBody = body;
 
-    // Tablet layout with navigation rail
-    if (screenWidth < 1200) {
-      return Scaffold(
-        body: Row(
-          children: [
-            _buildNavigationRail(context),
-            Expanded(child: child),
-          ],
-        ),
-      );
-    }
+        // For tablets and larger screens in landscape, use master-detail or multi-column layouts
+        if ((deviceType == DeviceType.tablet ||
+                deviceType == DeviceType.desktop ||
+                deviceType == DeviceType.largeDesktop) &&
+            isLandscape) {
+          scaffoldBody = _buildLandscapeLayout(context, scaffoldBody);
+        }
 
-    // Desktop layout with navigation drawer
-    return Scaffold(
-      body: Row(
-        children: [
-          _buildNavigationDrawer(context),
-          Expanded(child: child),
-        ],
-      ),
+        // For foldables, handle hinge area
+        if (ResponsiveUtils.isFoldable(context)) {
+          scaffoldBody = _buildFoldableLayout(context, scaffoldBody);
+        }
+
+        // For AR/VR supported devices, add XR-specific features
+        if (ResponsiveUtils.supportsARVR(context)) {
+          scaffoldBody = _buildXRLayout(context, scaffoldBody);
+        }
+
+        return Scaffold(
+          appBar: _buildAdaptiveAppBar(context),
+          body: scaffoldBody,
+          floatingActionButton: _buildAdaptiveFAB(context),
+          floatingActionButtonLocation: floatingActionButtonLocation,
+          floatingActionButtonAnimator: floatingActionButtonAnimator,
+          persistentFooterButtons: persistentFooterButtons,
+          drawer: _buildAdaptiveDrawer(context),
+          endDrawer: endDrawer,
+          bottomNavigationBar: _buildAdaptiveBottomNav(context),
+          bottomSheet: bottomSheet,
+          backgroundColor: backgroundColor,
+          resizeToAvoidBottomInset: resizeToAvoidBottomInset ?? true,
+          primary: primary,
+          drawerDragStartBehavior: drawerDragStartBehavior,
+          extendBody: extendBody,
+          extendBodyBehindAppBar: extendBodyBehindAppBar,
+          drawerScrimColor: drawerScrimColor,
+          drawerEdgeDragWidth: drawerEdgeDragWidth,
+          drawerEnableOpenDragGesture: drawerEnableOpenDragGesture,
+          endDrawerEnableOpenDragGesture: endDrawerEnableOpenDragGesture,
+          restorationId: restorationId,
+        );
+      },
     );
   }
 
-  Widget _buildBottomNavigationBar(BuildContext context) {
-    final currentIndex = _getCurrentIndex(currentLocation);
+  PreferredSizeWidget? _buildAdaptiveAppBar(BuildContext context) {
+    if (appBar == null) return null;
 
-    return NavigationBar(
-      selectedIndex: currentIndex,
-      onDestinationSelected: (index) {
-        // Simple navigation for demo
-        if (index == 0) {
-          Navigator.of(context).pushReplacementNamed('/home');
-        } else if (index == 1) {
-          Navigator.of(context).pushReplacementNamed('/courses');
-        } else if (index == 2) {
-          Navigator.of(context).pushReplacementNamed('/profile');
-        }
-      },
-      destinations: const [
-        NavigationDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
-          label: 'Home',
+    final deviceType = ResponsiveUtils.getDeviceType(context);
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    // For mobile in portrait, keep standard app bar
+    if (deviceType == DeviceType.mobile && !isLandscape) {
+      return appBar;
+    }
+
+    // For tablets and larger screens, enhance app bar with more actions
+    if (deviceType == DeviceType.tablet ||
+        deviceType == DeviceType.desktop ||
+        deviceType == DeviceType.largeDesktop) {
+      return _buildEnhancedAppBar(context);
+    }
+
+    return appBar;
+  }
+
+  PreferredSizeWidget _buildEnhancedAppBar(BuildContext context) {
+    // For enhanced app bar, just return the original for now
+    // In a full implementation, we'd create a custom app bar widget
+    return appBar!;
+  }
+
+  Widget _buildAppBarActions(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Search action for larger screens
+        IconButton(
+          icon: const Icon(Icons.search),
+          onPressed: () {
+            // Implement global search
+          },
         ),
-        NavigationDestination(
-          icon: Icon(Icons.school_outlined),
-          selectedIcon: Icon(Icons.school),
-          label: 'Courses',
+        // Notifications
+        IconButton(
+          icon: const Icon(Icons.notifications),
+          onPressed: () {
+            // Navigate to notifications
+          },
         ),
-        NavigationDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
-          label: 'Profile',
+        // Profile menu
+        PopupMenuButton<String>(
+          onSelected: (value) {
+            // Handle menu selection
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'profile', child: Text('Profile')),
+            const PopupMenuItem(value: 'settings', child: Text('Settings')),
+            const PopupMenuItem(value: 'logout', child: Text('Logout')),
+          ],
         ),
       ],
+    );
+  }
+
+  Widget _buildLandscapeLayout(BuildContext context, Widget child) {
+    final deviceType = ResponsiveUtils.getDeviceType(context);
+
+    // For tablets and desktops in landscape, use a two-column layout
+    if (deviceType == DeviceType.tablet) {
+      return Row(
+        children: [
+          // Sidebar for navigation or secondary content
+          SizedBox(
+            width: 280,
+            child: _buildSidebar(context),
+          ),
+          // Main content area
+          Expanded(
+            child: child,
+          ),
+        ],
+      );
+    }
+
+    // For desktops, use a more sophisticated layout
+    if (deviceType == DeviceType.desktop ||
+        deviceType == DeviceType.largeDesktop) {
+      return Row(
+        children: [
+          // Navigation rail
+          SizedBox(
+            width: 320,
+            child: _buildNavigationRail(context),
+          ),
+          // Main content
+          Expanded(
+            child: child,
+          ),
+          // Optional right sidebar for additional content
+          if (deviceType == DeviceType.largeDesktop)
+            SizedBox(
+              width: 280,
+              child: _buildRightSidebar(context),
+            ),
+        ],
+      );
+    }
+
+    return child;
+  }
+
+  Widget _buildFoldableLayout(BuildContext context, Widget child) {
+    // Handle foldable devices with hinge area
+    final screenSize = MediaQuery.of(context).size;
+    final hingeArea = screenSize.width * 0.1; // Assume 10% hinge area
+
+    return Row(
+      children: [
+        // Left screen area
+        SizedBox(
+          width: (screenSize.width - hingeArea) / 2,
+          child: child,
+        ),
+        // Hinge area (visual separator)
+        Container(
+          width: hingeArea,
+          color: Theme.of(context).dividerColor.withOpacity(0.5),
+        ),
+        // Right screen area
+        SizedBox(
+          width: (screenSize.width - hingeArea) / 2,
+          child: _buildFoldableSecondaryContent(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildXRLayout(BuildContext context, Widget child) {
+    // Add XR-specific UI elements
+    return Stack(
+      children: [
+        child,
+        // XR controls overlay
+        Positioned(
+          top: 16,
+          right: 16,
+          child: _buildXRControls(context),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSidebar(BuildContext context) {
+    // Implement sidebar for tablets
+    return Container(
+      color: Theme.of(context).colorScheme.surface,
+      child: Column(
+        children: [
+          // Navigation items
+          ListTile(
+            leading: const Icon(Icons.home),
+            title: const Text('Home'),
+            selected: currentLocation == '/',
+            onTap: () {
+              // Navigate to home
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.book),
+            title: const Text('Courses'),
+            selected: currentLocation.startsWith('/courses'),
+            onTap: () {
+              // Navigate to courses
+            },
+          ),
+          // Add more navigation items
+        ],
+      ),
     );
   }
 
   Widget _buildNavigationRail(BuildContext context) {
-    final currentIndex = _getCurrentIndex(currentLocation);
-
+    // Implement navigation rail for desktops
     return NavigationRail(
-      selectedIndex: currentIndex,
+      selectedIndex: _getSelectedIndex(),
       onDestinationSelected: (index) {
-        // Simple navigation for demo
-        if (index == 0) {
-          Navigator.of(context).pushReplacementNamed('/home');
-        } else if (index == 1) {
-          Navigator.of(context).pushReplacementNamed('/courses');
-        } else if (index == 2) {
-          Navigator.of(context).pushReplacementNamed('/profile');
-        }
+        // Handle navigation
       },
       labelType: NavigationRailLabelType.all,
-      backgroundColor: Theme.of(context).colorScheme.surface,
       destinations: const [
         NavigationRailDestination(
-          icon: Icon(Icons.home_outlined),
-          selectedIcon: Icon(Icons.home),
+          icon: Icon(Icons.home),
           label: Text('Home'),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.school_outlined),
-          selectedIcon: Icon(Icons.school),
+          icon: Icon(Icons.book),
           label: Text('Courses'),
         ),
         NavigationRailDestination(
-          icon: Icon(Icons.person_outline),
-          selectedIcon: Icon(Icons.person),
+          icon: Icon(Icons.person),
           label: Text('Profile'),
         ),
-      ],
-      trailing: Expanded(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.psychology),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('AI Tutor coming soon!')),
-                );
-              },
-              tooltip: 'AI Tutor',
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Settings coming soon!')),
-                );
-              },
-              tooltip: 'Settings',
-            ),
-            const SizedBox(height: 16),
-          ],
+        NavigationRailDestination(
+          icon: Icon(Icons.settings),
+          label: Text('Settings'),
         ),
-      ),
+      ],
     );
   }
 
-  Widget _buildNavigationDrawer(BuildContext context) {
+  Widget _buildRightSidebar(BuildContext context) {
+    // Implement right sidebar for large desktops
     return Container(
-      width: 280,
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        border: Border(
-          right: BorderSide(
-            color: Theme.of(context).dividerColor,
-            width: 1,
-          ),
-        ),
-      ),
+      color: Theme.of(context).colorScheme.surface,
+      padding: const EdgeInsets.all(16),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // App header
-          Container(
-            height: 120,
-            padding: const EdgeInsets.all(AppTheme.spacing6),
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.school,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'EduVerse',
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      Text(
-                        'Future of Learning',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.white.withOpacity(0.8),
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          Text(
+            'Quick Actions',
+            style: Theme.of(context).textTheme.titleMedium,
           ),
-
-          // Navigation items
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              children: [
-                // Main navigation
-                _buildDrawerItem(
-                  context,
-                  'Home',
-                  Icons.home_outlined,
-                  Icons.home,
-                  '/home',
-                  currentLocation == '/home',
-                ),
-                _buildDrawerItem(
-                  context,
-                  'Courses',
-                  Icons.school_outlined,
-                  Icons.school,
-                  '/courses',
-                  currentLocation == '/courses',
-                ),
-                _buildDrawerItem(
-                  context,
-                  'AI Tutor',
-                  Icons.psychology_outlined,
-                  Icons.psychology,
-                  '/ai-tutor',
-                  currentLocation == '/ai-tutor',
-                ),
-                _buildDrawerItem(
-                  context,
-                  'Profile',
-                  Icons.person_outline,
-                  Icons.person,
-                  '/profile',
-                  currentLocation == '/profile',
-                ),
-
-                const Divider(),
-
-                // Extended navigation
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Text(
-                    'More',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w600,
-                        ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-
-                _buildDrawerItem(
-                  context,
-                  'VR Classroom',
-                  Icons.meeting_room,
-                  Icons.meeting_room,
-                  '/vr-classroom',
-                  false,
-                ),
-                _buildDrawerItem(
-                  context,
-                  'Live Classes',
-                  Icons.video_call,
-                  Icons.video_call,
-                  '/live-class',
-                  false,
-                ),
-              ],
-            ),
+          const SizedBox(height: 16),
+          // Quick action buttons
+          ElevatedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.add),
+            label: const Text('New Course'),
           ),
-
-          // User section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).dividerColor,
-                  width: 1,
-                ),
-              ),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: AppTheme.primaryColor,
-                  child: const Text(
-                    'U',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'User Name',
-                        style: Theme.of(context).textTheme.titleSmall,
-                      ),
-                      Text(
-                        'Level 5 • 2,450 XP',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: AppTheme.textSecondary,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.settings),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Settings coming soon!')),
-                    );
-                  },
-                ),
-              ],
-            ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: () {},
+            icon: const Icon(Icons.upload),
+            label: const Text('Upload Content'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildDrawerItem(
-    BuildContext context,
-    String label,
-    IconData icon,
-    IconData selectedIcon,
-    String path,
-    bool isSelected,
-  ) {
+  Widget _buildFoldableSecondaryContent(BuildContext context) {
+    // Content for the second screen on foldables
     return Container(
-      margin: const EdgeInsets.symmetric(
-        horizontal: 8,
-        vertical: 2,
-      ),
-      child: ListTile(
-        leading: Icon(
-          isSelected ? selectedIcon : icon,
-          color: isSelected ? AppTheme.primaryColor : AppTheme.textSecondary,
-        ),
-        title: Text(
-          label,
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color:
-                    isSelected ? AppTheme.primaryColor : AppTheme.textPrimary,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-              ),
-        ),
-        selected: isSelected,
-        selectedTileColor: AppTheme.primaryColor.withValues(alpha: 0.1),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        onTap: () {
-          Navigator.of(context).pushReplacementNamed(path);
-        },
+      color: Theme.of(context).colorScheme.surface,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          Text(
+            'Secondary Content',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          // Add secondary content like notifications, quick actions, etc.
+        ],
       ),
     );
   }
 
-  int _getCurrentIndex(String location) {
-    if (location.startsWith('/home')) {
-      return 0;
-    } else if (location.startsWith('/courses')) {
-      return 1;
-    } else if (location.startsWith('/profile')) {
-      return 2;
+  Widget _buildXRControls(BuildContext context) {
+    // XR-specific controls
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              icon: const Icon(Icons.view_in_ar),
+              onPressed: () {
+                // Toggle AR mode
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.vrpano),
+              onPressed: () {
+                // Toggle VR mode
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildAdaptiveFAB(BuildContext context) {
+    if (floatingActionButton == null) return null;
+
+    final deviceType = ResponsiveUtils.getDeviceType(context);
+
+    // For larger screens, make FAB larger and more prominent
+    if (deviceType == DeviceType.desktop ||
+        deviceType == DeviceType.largeDesktop) {
+      return FloatingActionButton.extended(
+        onPressed: () {
+          // Handle FAB press - would need to extract from original FAB
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('Create'),
+      );
     }
-    return 0;
+
+    return floatingActionButton;
+  }
+
+  Widget? _buildAdaptiveDrawer(BuildContext context) {
+    final deviceType = ResponsiveUtils.getDeviceType(context);
+
+    // For larger screens, don't show drawer as we have navigation rail/sidebar
+    if (deviceType == DeviceType.desktop ||
+        deviceType == DeviceType.largeDesktop) {
+      return null;
+    }
+
+    return drawer;
+  }
+
+  Widget? _buildAdaptiveBottomNav(BuildContext context) {
+    final deviceType = ResponsiveUtils.getDeviceType(context);
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    // For tablets and desktops in landscape, don't show bottom nav
+    if ((deviceType == DeviceType.tablet ||
+            deviceType == DeviceType.desktop ||
+            deviceType == DeviceType.largeDesktop) &&
+        isLandscape) {
+      return null;
+    }
+
+    return bottomNavigationBar;
+  }
+
+  int _getSelectedIndex() {
+    // Map current location to navigation index
+    if (currentLocation.startsWith('/courses')) return 1;
+    if (currentLocation.startsWith('/profile')) return 2;
+    if (currentLocation.startsWith('/settings')) return 3;
+    return 0; // Home
   }
 }

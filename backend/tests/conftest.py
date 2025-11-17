@@ -2,14 +2,19 @@
 Test configuration for EduVerse backend
 """
 
-import pytest
 import asyncio
 import os
 import sys
 from pathlib import Path
 
+import pytest
+from fastapi.testclient import TestClient
+from httpx import AsyncClient
+
 # Add the parent directory to the path so we can import the app
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from app.main import app
 
 # Set test environment variables
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
@@ -35,42 +40,25 @@ async def setup_test_database():
     print("✅ Test database setup completed")
 
 @pytest.fixture
-def db_session():
-    """Database session fixture"""
+async def db_session():
+    """Database session fixture with transaction rollback"""
     from app.core.database import AsyncSessionLocal
 
-    session = AsyncSessionLocal()
-    try:
-        yield session
-    finally:
-        # Note: In a real test, you'd want to properly close the session
-        # But for simplicity with pytest-asyncio, we'll let it be
-        pass
+    async with AsyncSessionLocal() as session:
+        async with session.begin():
+            yield session
 
-try:
-    from app.main import app
-    from fastapi.testclient import TestClient
-    from httpx import AsyncClient
+from app.main import app
+from fastapi.testclient import TestClient
+from httpx import AsyncClient
 
-    @pytest.fixture
-    def client():
-        """Test client fixture"""
-        return TestClient(app)
+@pytest.fixture
+def client():
+    """Test client fixture"""
+    return TestClient(app)
 
-    @pytest.fixture
-    def async_client():
-        """Async test client fixture"""
-        return AsyncClient(app=app, base_url="http://testserver")
 
-except ImportError as e:
-    print(f"Warning: Could not import app for testing: {e}")
-
-    @pytest.fixture
-    def client():
-        """Mock client fixture when app import fails"""
-        return None
-
-    @pytest.fixture
-    async def async_client():
-        """Mock async client fixture when app import fails"""
-        return None
+@pytest.fixture
+def async_client():
+    """Async test client fixture"""
+    return AsyncClient(app=app, base_url="http://testserver")
