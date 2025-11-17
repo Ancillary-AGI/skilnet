@@ -1,7 +1,7 @@
 name: eduverse
 description: Advanced E-Learning Platform with VR/AR and AI capabilities - The Future of Learning
 publish_to: 'none'
-version: 2.0.0+1
+version: 0.1.0
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
