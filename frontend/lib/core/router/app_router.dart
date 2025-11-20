@@ -97,10 +97,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, state) {
+      // For simplicity and to avoid async issues in redirect,
+      // we'll use a synchronous check with proper error handling
       try {
         final isLoggedIn = CacheService.isLoggedIn;
         final isOnboarding =
-            CacheService.getSetting('onboarding_completed') ?? false;
+            CacheService.getSetting<bool>('onboarding_completed') ?? false;
 
         // If not onboarded, go to onboarding
         if (!isOnboarding && state.matchedLocation != '/onboarding') {
@@ -117,8 +119,9 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
         return null; // No redirect needed
       } catch (e) {
-        // Fallback for tests or when cache is not initialized
-        return null;
+        // If cache is not initialized, default to onboarding
+        debugPrint('Router redirect error: $e');
+        return '/onboarding';
       }
     },
     errorBuilder: (context, state) => Scaffold(

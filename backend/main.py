@@ -28,15 +28,36 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
     print("🚀 Starting EduVerse API...")
-    
-    # Initialize all systems
-    init_status = await startup_initialization()
-    print(f"📊 Initialization Status: {init_status['status']}")
-    
+
+    try:
+        # Initialize all systems
+        init_status = await startup_initialization()
+        print(f"📊 Initialization Status: {init_status['status']}")
+    except Exception as e:
+        print(f"❌ Critical startup error: {e}")
+        raise
+
     yield
-    
-    # Shutdown
+
+    # Shutdown - proper cleanup
     print("🔄 Shutting down EduVerse API...")
+
+    try:
+        # Close database connections
+        from app.core.database import async_engine
+        await async_engine.dispose()
+        print("✅ Database connections closed")
+
+        # Close MongoDB connections if any
+        from app.core.database import mongo_db
+        await mongo_db.disconnect()
+        print("✅ MongoDB connections closed")
+
+        # Close any other resources
+        print("✅ All resources cleaned up")
+
+    except Exception as e:
+        print(f"⚠️  Error during shutdown cleanup: {e}")
 
 # Create FastAPI application with comprehensive metadata
 app = FastAPI(
@@ -123,12 +144,40 @@ app = FastAPI(
 )
 
 # CORS middleware for cross-origin requests
+# In production, replace with specific allowed origins
+allowed_origins = [
+    "http://localhost:3000",  # React dev server
+    "http://localhost:8080",  # Vue dev server
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8080",
+    "https://eduverse.com",  # Production domain
+    "https://app.eduverse.com",
+    "https://*.eduverse.com",  # Subdomains
+]
+
+# For development, allow localhost origins
+import os
+if os.getenv("ENVIRONMENT") == "development":
+    allowed_origins.extend([
+        "http://localhost:*",
+        "http://127.0.0.1:*",
+        "http://0.0.0.0:*",
+    ])
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allow_headers=[
+        "Accept",
+        "Accept-Language",
+        "Content-Language",
+        "Content-Type",
+        "Authorization",
+        "X-Requested-With",
+    ],
+    max_age=86400,  # 24 hours
 )
 
 # Include API routers
@@ -148,12 +197,12 @@ async def health_check():
 @app.get("/health/database", tags=["Health"])
 async def database_health_check():
     """Database health check"""
+    from app.core.database import AsyncSessionLocal
+
     try:
-        # Test database connection
-        from app.core.database import SessionLocal
-        db = SessionLocal()
-        db.execute("SELECT 1")
-        db.close()
+        # Test database connection with proper async context manager
+        async with AsyncSessionLocal() as session:
+            await session.execute("SELECT 1")
 
         return {
             "status": "healthy",

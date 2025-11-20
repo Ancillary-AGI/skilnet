@@ -16,57 +16,169 @@ import 'core/providers/app_providers.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Hive for local storage
-  await Hive.initFlutter();
+  try {
+    // Initialize Hive for local storage
+    await Hive.initFlutter();
 
-  // Initialize core services
-  await CacheService.initialize();
-  await AnalyticsService.initialize();
-  await NotificationService.initialize();
+    // Initialize core services with error handling
+    await _initializeServices();
 
-  // Initialize new polished services
-  await AssetCacheService.instance.initialize();
-  await AssetCacheService.instance.preloadCriticalAssets();
+    // Configure system UI
+    await _configureSystemUI();
 
-  // Initialize asset discovery service
-  await AssetService().initialize();
-  await AssetService().preloadCriticalAssets();
+    // Run the app
+    runApp(
+      const ProviderScope(
+        child: EduVerseApp(),
+      ),
+    );
+  } catch (error, stackTrace) {
+    // Log critical startup errors
+    debugPrint('❌ Critical startup error: $error');
+    debugPrint('Stack trace: $stackTrace');
 
-  // Set preferred orientations for all device types
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
-
-  // Enhanced system UI overlay style with responsive considerations
-  SystemChrome.setSystemUIOverlayStyle(
-    const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarIconBrightness: Brightness.dark,
-    ),
-  );
-
-  // Enable high refresh rate displays
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-  // API service is now auto-initialized
-
-  runApp(
-    const ProviderScope(
-      child: EduVerseApp(),
-    ),
-  );
+    // Run app with error screen for debugging
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.error, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                const Text(
+                  'Failed to start EduVerse',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Error: $error',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.grey),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class EduVerseApp extends ConsumerWidget {
+Future<void> _initializeServices() async {
+  try {
+    // Initialize core services
+    await CacheService.initialize();
+    await AnalyticsService.initialize();
+    await NotificationService.initialize();
+
+    // Initialize asset services (avoiding duplication)
+    final assetService = AssetService();
+    await assetService.initialize();
+    await assetService.preloadCriticalAssets();
+
+    debugPrint('✅ All services initialized successfully');
+  } catch (e) {
+    debugPrint('❌ Service initialization failed: $e');
+    rethrow;
+  }
+}
+
+Future<void> _configureSystemUI() async {
+  try {
+    // Set preferred orientations for all device types
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+
+    // Enhanced system UI overlay style with responsive considerations
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.dark,
+      ),
+    );
+
+    // Enable high refresh rate displays
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  } catch (e) {
+    debugPrint('⚠️  System UI configuration failed: $e');
+    // Continue anyway as this is not critical
+  }
+}
+
+class EduVerseApp extends ConsumerStatefulWidget {
   const EduVerseApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EduVerseApp> createState() => _EduVerseAppState();
+}
+
+class _EduVerseAppState extends ConsumerState<EduVerseApp>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    // Cleanup services on app disposal
+    _cleanupServices();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+
+    switch (state) {
+      case AppLifecycleState.paused:
+        // App is in background
+        debugPrint('App paused - saving state');
+        break;
+      case AppLifecycleState.resumed:
+        // App is in foreground
+        debugPrint('App resumed');
+        break;
+      case AppLifecycleState.inactive:
+        // App is inactive
+        debugPrint('App inactive');
+        break;
+      case AppLifecycleState.detached:
+        // App is terminating
+        debugPrint('App detached - final cleanup');
+        _cleanupServices();
+        break;
+      case AppLifecycleState.hidden:
+        // App is hidden (iOS specific)
+        debugPrint('App hidden');
+        break;
+    }
+  }
+
+  Future<void> _cleanupServices() async {
+    try {
+      // Dispose cache service
+      await CacheService.dispose();
+
+      // Dispose other services if they have dispose methods
+      debugPrint('✅ Services cleaned up');
+    } catch (e) {
+      debugPrint('⚠️  Error during service cleanup: $e');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeProvider);
 
