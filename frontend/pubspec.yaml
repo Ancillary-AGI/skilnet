@@ -94,6 +94,8 @@ dependencies:
   device_info_plus: ^9.1.2
   network_info_plus: ^4.1.0
   
+  path: any
+  sqflite: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

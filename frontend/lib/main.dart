@@ -8,7 +8,7 @@ import 'core/services/cache_service.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/asset_cache_service.dart';
-import 'core/services/haptic_service.dart';
+import 'core/services/asset_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/responsive_utils.dart';
 import 'core/providers/app_providers.dart';
@@ -27,6 +27,10 @@ void main() async {
   // Initialize new polished services
   await AssetCacheService.instance.initialize();
   await AssetCacheService.instance.preloadCriticalAssets();
+
+  // Initialize asset discovery service
+  await AssetService().initialize();
+  await AssetService().preloadCriticalAssets();
 
   // Set preferred orientations for all device types
   await SystemChrome.setPreferredOrientations([

@@ -49,7 +49,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const CourseCatalogScreen(),
         routes: [
           GoRoute(
-            path: '/:courseId',
+            path: ':courseId',
             name: 'course-detail',
             builder: (context, state) {
               final courseId = state.pathParameters['courseId']!;

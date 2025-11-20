@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:integration_test/integration_test.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,10 +18,11 @@ void main() {
 
       // Should start with onboarding
       expect(find.text('Welcome to EduVerse'), findsOneWidget);
-      expect(find.text('🎓'), findsOneWidget);
+      expect(find.text('The Future of Learning'), findsOneWidget);
     });
 
-    testWidgets('Navigation through onboarding works', (WidgetTester tester) async {
+    testWidgets('Navigation through onboarding works',
+        (WidgetTester tester) async {
       await tester.pumpWidget(
         const ProviderScope(
           child: app.EduVerseApp(),

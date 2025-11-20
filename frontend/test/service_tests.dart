@@ -1,5 +1,4 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'dart:convert';
 
 // Import the services we want to test
 import 'package:eduverse/core/services/api_service.dart';

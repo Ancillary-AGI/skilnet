@@ -7,7 +7,6 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../shared/widgets/adaptive_card.dart';
 import '../../../shared/widgets/progress_ring.dart';
-import '../providers/wellness_provider.dart';
 import '../widgets/breathing_exercise_widget.dart';
 import '../widgets/mood_tracker_widget.dart';
 import '../widgets/stress_monitor_widget.dart';

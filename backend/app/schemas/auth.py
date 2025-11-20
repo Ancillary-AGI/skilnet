@@ -23,8 +23,11 @@ class UserBase(BaseModel):
     is_instructor: bool = Field(False, description="Whether user is an instructor")
 
 
-class UserCreate(UserBase):
+class UserCreate(BaseModel):
     """Schema for creating a new user"""
+    email: EmailStr = Field(..., description="User email address")
+    username: str = Field(..., min_length=3, max_length=50, description="Username")
+    full_name: str = Field(..., min_length=1, max_length=100, description="Full name")
     password: str = Field(..., min_length=8, description="User password")
 
 
@@ -32,8 +35,7 @@ class UserUpdate(BaseModel):
     """Schema for updating user information"""
     email: Optional[EmailStr] = Field(None, description="User email address")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Username")
-    first_name: Optional[str] = Field(None, min_length=1, max_length=50, description="First name")
-    last_name: Optional[str] = Field(None, min_length=1, max_length=50, description="Last name")
+    full_name: Optional[str] = Field(None, min_length=1, max_length=100, description="Full name")
     is_instructor: Optional[bool] = Field(None, description="Whether user is an instructor")
     is_active: Optional[bool] = Field(None, description="Whether user account is active")
 

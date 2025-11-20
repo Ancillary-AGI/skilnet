@@ -17,7 +17,7 @@ from .endpoints import (
     auth, courses, enrollments, content, analytics, collaboration,
     certificates, adaptive_learning, payments,
     categories, websocket, discussions, subscriptions,
-    translations, app_updates
+    translations, app_updates, adaptive_content
 )
 
 # Create main API router
@@ -77,6 +77,13 @@ api_router.include_router(
     adaptive_learning.router,
     prefix="/adaptive-learning",
     tags=["Adaptive Learning"],
+    responses={403: {"description": "Forbidden"}}
+)
+
+api_router.include_router(
+    adaptive_content.router,
+    prefix="/adaptive-content",
+    tags=["Adaptive Content"],
     responses={403: {"description": "Forbidden"}}
 )
 
@@ -145,6 +152,7 @@ async def api_health_check():
             "collaboration": "/collaboration",
             "certificates": "/certificates",
             "adaptive_learning": "/adaptive-learning",
+            "adaptive_content": "/adaptive-content",
             "payments": "/payments"
         }
     }
