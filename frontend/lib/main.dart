@@ -95,22 +95,44 @@ Future<void> _configureSystemUI() async {
       DeviceOrientation.landscapeRight,
     ]);
 
-    // Enhanced system UI overlay style with responsive considerations
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-        systemNavigationBarColor: Colors.transparent,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      ),
-    );
-
     // Enable high refresh rate displays
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    // Set initial system UI overlay style based on system theme
+    // This will be overridden when the app builds with the actual theme
+    final brightness =
+        WidgetsBinding.instance.platformDispatcher.platformBrightness;
+    SystemChrome.setSystemUIOverlayStyle(_getSystemUiOverlayStyle(brightness));
   } catch (e) {
     debugPrint('⚠️  System UI configuration failed: $e');
     // Continue anyway as this is not critical
   }
+}
+
+/// Returns the appropriate system UI overlay style based on theme brightness
+SystemUiOverlayStyle _getSystemUiOverlayStyle(Brightness brightness) {
+  return SystemUiOverlayStyle(
+    // Status bar styling
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: brightness == Brightness.light
+        ? Brightness.dark // Dark icons on light background
+        : Brightness.light, // Light icons on dark background
+
+    // Navigation bar styling
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarIconBrightness: brightness == Brightness.light
+        ? Brightness.dark // Dark icons on light background
+        : Brightness.light, // Light icons on dark background
+
+    // Additional properties for better integration
+    systemNavigationBarDividerColor: Colors.transparent,
+  );
+}
+
+/// Updates system UI overlay style based on current theme
+void _updateSystemUiOverlayStyle(BuildContext context) {
+  final brightness = Theme.of(context).brightness;
+  SystemChrome.setSystemUIOverlayStyle(_getSystemUiOverlayStyle(brightness));
 }
 
 class EduVerseApp extends ConsumerStatefulWidget {
@@ -181,6 +203,11 @@ class _EduVerseAppState extends ConsumerState<EduVerseApp>
   Widget build(BuildContext context) {
     final router = ref.watch(appRouterProvider);
     final themeMode = ref.watch(themeProvider);
+
+    // Update system UI overlay style based on current theme
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateSystemUiOverlayStyle(context);
+    });
 
     return MaterialApp.router(
       title: AppConfig.appName,
