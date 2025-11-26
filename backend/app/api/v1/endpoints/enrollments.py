@@ -4,10 +4,14 @@ Enrollment management endpoints
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Body
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from typing import List, Optional, Dict, Any
 from app.core.database import get_db
 from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
+from app.models.enrollment import Enrollment
+from app.models.course import Course
 from app.services.enrollment_service import EnrollmentService
 from app.schemas.enrollment import (
     EnrollmentResponse, EnrollmentUpdate, EnrollmentStatistics,
@@ -65,16 +69,29 @@ async def get_enrollment(
     """Get enrollment by ID"""
     enrollment_service = EnrollmentService(db)
 
-    # For now, allow users to see their own enrollments
-    # In a more complex system, you might want different permission levels
-    # TODO: Add proper permission checks
-
-    # This endpoint would need to be modified to properly check ownership
-    # For now, we'll implement a simpler version
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Individual enrollment retrieval not yet implemented"
+    # Get enrollment with related data
+    result = await db.execute(
+        select(Enrollment).options(
+            selectinload(Enrollment.user),
+            selectinload(Enrollment.course)
+        ).where(Enrollment.id == enrollment_id)
     )
+    enrollment = result.scalar_one_or_none()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enrollment not found"
+        )
+
+    # Check if user owns this enrollment or is admin
+    if enrollment.user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this enrollment"
+        )
+
+    return EnrollmentResponse.from_orm(enrollment)
 
 @router.put("/{enrollment_id}/progress", response_model=EnrollmentResponse)
 async def update_enrollment_progress(
@@ -86,12 +103,31 @@ async def update_enrollment_progress(
     """Update enrollment progress"""
     enrollment_service = EnrollmentService(db)
 
-    # TODO: Implement proper enrollment ownership validation
-    # For now, this is a placeholder
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Progress update not yet implemented"
+    # Get enrollment to check ownership
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id)
     )
+    enrollment = result.scalar_one_or_none()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enrollment not found"
+        )
+
+    # Check if user owns this enrollment
+    if enrollment.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this enrollment"
+        )
+
+    # Update progress using service
+    updated_enrollment = await enrollment_service.update_enrollment_progress(
+        current_user.id, enrollment.course_id, progress_data
+    )
+
+    return EnrollmentResponse.from_orm(updated_enrollment)
 
 @router.post("/{enrollment_id}/complete", response_model=EnrollmentResponse)
 async def complete_enrollment(
@@ -103,11 +139,38 @@ async def complete_enrollment(
     """Mark enrollment as completed"""
     enrollment_service = EnrollmentService(db)
 
-    # TODO: Implement proper enrollment ownership validation and completion logic
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Enrollment completion not yet implemented"
+    # Get enrollment to check ownership
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id)
     )
+    enrollment = result.scalar_one_or_none()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enrollment not found"
+        )
+
+    # Check if user owns this enrollment
+    if enrollment.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to complete this enrollment"
+        )
+
+    # Update final score if provided
+    if final_score is not None:
+        progress_data = EnrollmentUpdate(final_score=final_score)
+        await enrollment_service.update_enrollment_progress(
+            current_user.id, enrollment.course_id, progress_data
+        )
+
+    # Complete enrollment
+    completed_enrollment = await enrollment_service.complete_enrollment(
+        current_user.id, enrollment.course_id
+    )
+
+    return EnrollmentResponse.from_orm(completed_enrollment)
 
 @router.delete("/{enrollment_id}")
 async def unenroll_from_course(
@@ -118,11 +181,35 @@ async def unenroll_from_course(
     """Unenroll from a course"""
     enrollment_service = EnrollmentService(db)
 
-    # TODO: Implement unenrollment logic
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Unenrollment not yet implemented"
+    # Get enrollment to check ownership
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id)
     )
+    enrollment = result.scalar_one_or_none()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enrollment not found"
+        )
+
+    # Check if user owns this enrollment
+    if enrollment.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to unenroll from this course"
+        )
+
+    # Unenroll user
+    success = await enrollment_service.unenroll_user(current_user.id, enrollment.course_id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to unenroll from course"
+        )
+
+    return {"message": "Successfully unenrolled from course"}
 
 @router.post("/{enrollment_id}/certificate", response_model=EnrollmentResponse)
 async def issue_certificate(
@@ -134,11 +221,37 @@ async def issue_certificate(
     """Issue completion certificate"""
     enrollment_service = EnrollmentService(db)
 
-    # TODO: Implement certificate issuance logic
-    raise HTTPException(
-        status_code=status.HTTP_501_NOT_IMPLEMENTED,
-        detail="Certificate issuance not yet implemented"
+    # Get enrollment to check ownership
+    result = await db.execute(
+        select(Enrollment).where(Enrollment.id == enrollment_id)
     )
+    enrollment = result.scalar_one_or_none()
+
+    if not enrollment:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Enrollment not found"
+        )
+
+    # Check if user owns this enrollment or is admin/instructor
+    if enrollment.user_id != current_user.id and not getattr(current_user, 'is_admin', False):
+        # Check if user is the instructor of the course
+        course_result = await db.execute(
+            select(Course).where(Course.id == enrollment.course_id)
+        )
+        course = course_result.scalar_one_or_none()
+        if not course or course.instructor_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to issue certificate for this enrollment"
+            )
+
+    # Issue certificate
+    updated_enrollment = await enrollment_service.issue_certificate(
+        enrollment.user_id, enrollment.course_id, certificate_data.certificate_url
+    )
+
+    return EnrollmentResponse.from_orm(updated_enrollment)
 
 @router.get("/course/{course_id}/enrollments")
 async def get_course_enrollments(

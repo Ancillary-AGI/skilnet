@@ -7,7 +7,6 @@ import 'core/router/app_router.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/asset_cache_service.dart';
 import 'core/services/asset_service.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/responsive_utils.dart';
@@ -34,7 +33,7 @@ void main() async {
     );
   } catch (error, stackTrace) {
     // Log critical startup errors
-    debugPrint('❌ Critical startup error: $error');
+    debugPrint('Error Critical startup error: $error');
     debugPrint('Stack trace: $stackTrace');
 
     // Run app with error screen for debugging

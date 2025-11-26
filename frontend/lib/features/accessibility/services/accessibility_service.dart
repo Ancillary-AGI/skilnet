@@ -134,17 +134,13 @@ class AccessibilityService {
 
   // Cognitive assistance state
   bool _cognitiveAssistanceEnabled = false;
-  bool _simplifiedInterfaceEnabled = false;
-  bool _memoryAidsEnabled = false;
 
   // Motor assistance state
   bool _motorAssistanceEnabled = false;
-  bool _switchControlEnabled = false;
   double _dwellTime = 1.0;
 
   // Seizure protection state
   bool _seizureProtectionEnabled = false;
-  bool _reduceMotionEnabled = false;
 
   // Streams for real-time updates
   final StreamController<AccessibilityProfile?> _profileController =
@@ -599,19 +595,12 @@ class AccessibilityService {
     _cognitiveAssistanceEnabled = true;
     await _prefs.setBool('cognitive_assistance_enabled', true);
 
-    // Enable related features
-    _simplifiedInterfaceEnabled = true;
-    _memoryAidsEnabled = true;
-
     _notifySettingsChange();
   }
 
   Future<void> disableCognitiveAssistance() async {
     _cognitiveAssistanceEnabled = false;
     await _prefs.setBool('cognitive_assistance_enabled', false);
-
-    _simplifiedInterfaceEnabled = false;
-    _memoryAidsEnabled = false;
 
     _notifySettingsChange();
   }
@@ -642,7 +631,6 @@ class AccessibilityService {
   // Seizure Protection functionality
   Future<void> enableSeizureProtection() async {
     _seizureProtectionEnabled = true;
-    _reduceMotionEnabled = true;
 
     await _prefs.setBool('seizure_protection_enabled', true);
     await _prefs.setBool('reduce_motion_enabled', true);
@@ -652,7 +640,6 @@ class AccessibilityService {
 
   Future<void> disableSeizureProtection() async {
     _seizureProtectionEnabled = false;
-    _reduceMotionEnabled = false;
 
     await _prefs.setBool('seizure_protection_enabled', false);
     await _prefs.setBool('reduce_motion_enabled', false);

@@ -10,7 +10,7 @@ from app.api.v1.endpoints.auth import get_current_user
 from app.models.user import User
 from app.services.course_service import CourseService
 from app.services.enrollment_service import EnrollmentService
-from app.schemas.course import CourseCreate, CourseUpdate, CourseFilter, CourseResponse
+from app.schemas.course import CourseCreate, CourseUpdate, CourseFilter, CourseResponse, CourseRatingCreate, CourseRatingResponse
 from app.schemas.enrollment import EnrollmentResponse, EnrollmentUpdate
 
 router = APIRouter()
@@ -206,7 +206,7 @@ async def get_instructor_courses(
 @router.post("/{course_id}/rate")
 async def rate_course(
     course_id: str,
-    rating: float = Body(..., ge=1.0, le=5.0, description="Rating value (1-5)"),
+    rating_data: CourseRatingCreate = Body(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
@@ -221,12 +221,66 @@ async def rate_course(
             detail="Course not found"
         )
 
-    # TODO: Implement proper rating system with user rating records
-    # For now, just update the course rating
-    await course_service.update_course_rating(course_id, rating)
+    # Create or update rating
+    rating = await course_service.create_or_update_rating(
+        current_user.id, course_id, rating_data
+    )
 
     return {
         "message": "Course rated successfully",
         "course_id": course_id,
-        "rating": rating
+        "rating": rating.rating,
+        "review_text": rating.review_text
     }
+
+@router.get("/{course_id}/ratings")
+async def get_course_ratings(
+    course_id: str,
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db)
+):
+    """Get ratings for a course"""
+    course_service = CourseService(db)
+
+    # Check if course exists
+    course = await course_service.get_course_by_id(course_id)
+    if not course:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Course not found"
+        )
+
+    result = await course_service.get_course_ratings(course_id, skip=skip, limit=limit)
+
+    # Convert ratings to response format
+    ratings_data = []
+    for rating in result["ratings"]:
+        ratings_data.append(CourseRatingResponse.from_orm(rating))
+
+    return {
+        "course_id": course_id,
+        "ratings": ratings_data,
+        "total": result["total"],
+        "skip": result["skip"],
+        "limit": result["limit"]
+    }
+
+@router.delete("/{course_id}/rating")
+async def delete_course_rating(
+    course_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    """Delete user's rating for a course"""
+    course_service = CourseService(db)
+
+    success = await course_service.delete_rating(current_user.id, course_id)
+
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Rating not found"
+        )
+
+    return {"message": "Rating deleted successfully"}

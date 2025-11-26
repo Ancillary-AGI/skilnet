@@ -65,8 +65,14 @@ class ContentService:
             # Generate streaming URLs (HLS/DASH)
             streaming_urls = await self._generate_streaming_urls(file_path)
 
-            # Update course with video URL
-            # TODO: Update course model to store video URLs
+            # Store video information in course
+            await self._store_video_in_course(course_id, {
+                "file_path": file_path,
+                "file_url": upload_result,
+                "streaming_urls": streaming_urls,
+                "filename": filename,
+                "uploaded_at": datetime.utcnow().isoformat()
+            })
 
             self.logger.info(f"Video uploaded for course {course_id}: {filename}")
 
@@ -411,6 +417,256 @@ class ContentService:
     def _is_document_file(self, file_path: str) -> bool:
         """Check if file is a document"""
         return Path(file_path).suffix.lower() in self.allowed_document_types
+
+    @log_performance
+    async def process_content_item(
+        self,
+        course_id: str,
+        content_path: str,
+        content_type: str,
+        instructor_id: str
+    ) -> Dict[str, Any]:
+        """Process a single content item"""
+        try:
+            # Validate course ownership
+            course = await self._validate_course_ownership(course_id, instructor_id)
+            if not course:
+                raise ValueError("Course not found or access denied")
+
+            # Download content for processing
+            content_data = await storage_service.download_file(content_path)
+            if not content_data:
+                raise ValueError(f"Could not download content: {content_path}")
+
+            processing_result = {
+                "content_path": content_path,
+                "content_type": content_type,
+                "processed_at": datetime.utcnow().isoformat(),
+                "operations": []
+            }
+
+            # Process based on content type
+            if content_type == "videos":
+                result = await self._process_video_content(content_path, content_data)
+                processing_result["operations"].extend(result["operations"])
+                processing_result.update(result)
+
+            elif content_type == "images" or content_type == "thumbnails":
+                result = await self._process_image_content(content_path, content_data)
+                processing_result["operations"].extend(result["operations"])
+                processing_result.update(result)
+
+            elif content_type == "documents":
+                result = await self._process_document_content(content_path, content_data)
+                processing_result["operations"].extend(result["operations"])
+                processing_result.update(result)
+
+            # Update metadata
+            metadata = await self.generate_content_metadata(content_path, content_data)
+            processing_result["metadata"] = metadata
+
+            self.logger.info(f"Processed content: {content_path}")
+            return processing_result
+
+        except Exception as e:
+            self.logger.error(f"Content processing failed for {content_path}: {e}")
+            return {
+                "content_path": content_path,
+                "error": str(e),
+                "processed_at": datetime.utcnow().isoformat(),
+                "status": "failed"
+            }
+
+    @log_performance
+    async def update_course_video_urls(self, course_id: str, processing_results: List[Dict[str, Any]]) -> None:
+        """Update course with processed video URLs"""
+        try:
+            # Collect all video URLs from processing results
+            video_urls = []
+            for result in processing_results:
+                if result.get("streaming_urls"):
+                    video_urls.append({
+                        "original_path": result["content_path"],
+                        "streaming_urls": result["streaming_urls"],
+                        "duration": result.get("metadata", {}).get("duration", 0),
+                        "processed_at": result["processed_at"]
+                    })
+
+            if video_urls:
+                # Update course with video information
+                from app.core.database import get_db
+                from sqlalchemy import update
+
+                async with get_db() as db:
+                    # For now, store as JSON in a new field or update existing video field
+                    # This would need a course model update to properly store multiple videos
+                    await db.execute(
+                        update(Course)
+                        .where(Course.id == course_id)
+                        .values(video_content=video_urls)
+                    )
+                    await db.commit()
+
+                self.logger.info(f"Updated course {course_id} with {len(video_urls)} processed videos")
+
+        except Exception as e:
+            self.logger.error(f"Failed to update course video URLs: {e}")
+
+    async def _process_video_content(self, content_path: str, content_data: bytes) -> Dict[str, Any]:
+        """Process video content - transcode, generate thumbnails, etc."""
+        operations = []
+
+        try:
+            # Generate streaming URLs (HLS/DASH)
+            streaming_urls = await self._generate_streaming_urls(content_path)
+            operations.append("streaming_urls_generated")
+
+            # Generate thumbnail from video
+            thumbnail_path = content_path.replace('/videos/', '/thumbnails/').replace('.mp4', '_thumb.jpg')
+            thumbnail_result = await self._generate_video_thumbnail(content_path, thumbnail_path)
+            if thumbnail_result["success"]:
+                operations.append("thumbnail_generated")
+
+            # Extract metadata
+            metadata = await self._get_video_metadata(content_data)
+            operations.append("metadata_extracted")
+
+            return {
+                "streaming_urls": streaming_urls,
+                "thumbnail_url": thumbnail_result.get("url"),
+                "metadata": metadata,
+                "operations": operations,
+                "status": "success"
+            }
+
+        except Exception as e:
+            return {
+                "error": str(e),
+                "operations": operations,
+                "status": "partial_success" if operations else "failed"
+            }
+
+    async def _process_image_content(self, content_path: str, content_data: bytes) -> Dict[str, Any]:
+        """Process image content - generate different sizes"""
+        operations = []
+
+        try:
+            # Generate different thumbnail sizes
+            sizes = await self._generate_thumbnail_sizes(content_path)
+            operations.append("sizes_generated")
+
+            return {
+                "thumbnail_sizes": sizes,
+                "operations": operations,
+                "status": "success"
+            }
+
+        except Exception as e:
+            return {
+                "error": str(e),
+                "operations": operations,
+                "status": "failed"
+            }
+
+    async def _process_document_content(self, content_path: str, content_data: bytes) -> Dict[str, Any]:
+        """Process document content - extract text, generate preview"""
+        operations = []
+
+        try:
+            # Extract document metadata
+            metadata = await self._get_document_metadata(content_data)
+            operations.append("metadata_extracted")
+
+            # Generate preview/thumbnail if possible
+            preview_result = await self._generate_document_preview(content_path, content_data)
+            if preview_result["success"]:
+                operations.append("preview_generated")
+
+            return {
+                "metadata": metadata,
+                "preview_url": preview_result.get("url"),
+                "operations": operations,
+                "status": "success"
+            }
+
+        except Exception as e:
+            return {
+                "error": str(e),
+                "operations": operations,
+                "status": "failed"
+            }
+
+    async def _generate_video_thumbnail(self, video_path: str, thumbnail_path: str) -> Dict[str, Any]:
+        """Generate thumbnail from video"""
+        try:
+            # This would use ffmpeg or similar to extract a frame
+            # For now, create a placeholder
+            thumbnail_data = b"placeholder_thumbnail_data"
+            upload_result = await storage_service.upload_file(
+                file_path=thumbnail_path,
+                file_data=thumbnail_data,
+                content_type="image/jpeg"
+            )
+
+            return {
+                "success": True,
+                "url": upload_result,
+                "path": thumbnail_path
+            }
+
+        except Exception as e:
+            self.logger.error(f"Thumbnail generation failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _generate_document_preview(self, document_path: str, document_data: bytes) -> Dict[str, Any]:
+        """Generate preview for document"""
+        try:
+            # This would convert first page to image
+            # For now, create a placeholder
+            preview_path = document_path.replace('/documents/', '/previews/').replace('.pdf', '_preview.jpg')
+            preview_data = b"placeholder_preview_data"
+            upload_result = await storage_service.upload_file(
+                file_path=preview_path,
+                file_data=preview_data,
+                content_type="image/jpeg"
+            )
+
+            return {
+                "success": True,
+                "url": upload_result,
+                "path": preview_path
+            }
+
+        except Exception as e:
+            self.logger.error(f"Document preview generation failed: {e}")
+            return {"success": False, "error": str(e)}
+
+    async def _store_video_in_course(self, course_id: str, video_info: Dict[str, Any]) -> None:
+        """Store video information in course model"""
+        try:
+            from app.core.database import get_db
+            from sqlalchemy import select, update
+
+            async with get_db() as db:
+                # Get current video content
+                result = await db.execute(
+                    select(Course.video_content).where(Course.id == course_id)
+                )
+                current_videos = result.scalar_one_or_none() or []
+
+                # Add new video to the list
+                current_videos.append(video_info)
+
+                # Update course
+                await db.execute(
+                    update(Course)
+                    .where(Course.id == course_id)
+                    .values(video_content=current_videos)
+                )
+                await db.commit()
+
+        except Exception as e:
+            self.logger.error(f"Failed to store video in course: {e}")
 
     async def _validate_course_ownership(self, course_id: str, instructor_id: str) -> Optional[Course]:
         """Validate that user owns the course"""

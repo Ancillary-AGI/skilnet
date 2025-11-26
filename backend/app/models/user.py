@@ -158,6 +158,7 @@ class User(Base):
     courses = relationship("Course", back_populates="instructor")
     enrollments = relationship("Enrollment", back_populates="user")
     subscriptions = relationship("Subscription", back_populates="user")
+    course_ratings = relationship("CourseRating", back_populates="user")
     
     def __repr__(self):
         return f"<User(id={self.id}, email={self.email}, full_name={self.full_name})>"

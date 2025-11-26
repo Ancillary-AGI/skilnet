@@ -21,7 +21,7 @@ class InitializationService:
     
     async def initialize_all(self) -> Dict[str, Any]:
         """Initialize all systems and return status"""
-        print("🚀 Initializing EduVerse Backend Systems...")
+        print("Initializing EduVerse Backend Systems...")
         
         # Initialize database
         await self._initialize_database()
@@ -40,11 +40,11 @@ class InitializationService:
     async def _initialize_database(self):
         """Initialize database system"""
         try:
-            print(f"🗄️  Initializing {db_config.DB_TYPE.value} database...")
+            print(f"Initializing {db_config.DB_TYPE.value} database...")
             
             # Check connection first
             if await check_database_connection():
-                print("✅ Database connection successful")
+                print("Database connection successful")
                 
                 # Initialize tables
                 await init_database()
@@ -53,20 +53,20 @@ class InitializationService:
                 
                 # Print database info
                 db_info = get_database_info()
-                print(f"📊 Database Info: {db_info['type']} | Pool: {db_info['pool_size']} | SSL: {db_info['ssl_enabled']}")
+                print(f"Database Info: {db_info['type']} | Pool: {db_info['pool_size']} | SSL: {db_info['ssl_enabled']}")
                 
             else:
-                print("❌ Database connection failed")
-                
+                print("Database connection failed")
+
         except Exception as e:
-            print(f"❌ Database initialization failed: {e}")
+            print(f"Database initialization failed: {e}")
     
     async def _initialize_storage(self):
         """Initialize cloud storage system"""
         global storage_service
 
         try:
-            print(f"☁️  Initializing {storage_config.STORAGE_PROVIDER.value} storage...")
+            print(f"Initializing {storage_config.STORAGE_PROVIDER.value} storage...")
 
             # Test storage by uploading a small test file
             test_content = b"EduVerse storage test"
@@ -83,7 +83,7 @@ class InitializationService:
             print(f"📁 Storage Info: {storage_config.STORAGE_PROVIDER.value} | CDN: {storage_config.CDN_ENABLED}")
 
         except Exception as e:
-            print(f"❌ Storage initialization failed: {e}")
+            print(f"Storage initialization failed: {e}")
             # Fall back to local storage if cloud storage fails
             if storage_config.STORAGE_PROVIDER != "local":
                 print("🔄 Falling back to local storage...")
@@ -99,7 +99,7 @@ class InitializationService:
     async def _initialize_cache(self):
         """Initialize Redis cache"""
         try:
-            print("🔄 Initializing Redis cache...")
+            print("Initializing Redis cache...")
             
             # Test Redis connection
             import redis.asyncio as redis
@@ -112,25 +112,25 @@ class InitializationService:
             self.initialization_status["cache"] = True
             
         except Exception as e:
-            print(f"⚠️  Redis cache not available: {e}")
-            print("💡 Continuing without cache (will use in-memory fallback)")
+            print(f"Warning Redis cache not available: {e}")
+            print("Note Continuing without cache (will use in-memory fallback)")
     
     async def _initialize_ai_services(self):
         """Initialize AI services"""
         try:
-            print("🤖 Initializing AI services...")
-            
+            print("AI Initializing AI services...")
+
             # Check if OpenAI API key is configured
             import os
             if os.getenv("OPENAI_API_KEY"):
-                print("✅ OpenAI API configured")
+                print("Success OpenAI API configured")
                 self.initialization_status["ai_services"] = True
             else:
-                print("⚠️  OpenAI API key not configured")
-                print("💡 AI features will be limited")
-            
+                print("Warning OpenAI API key not configured")
+                print("Note AI features will be limited")
+
         except Exception as e:
-            print(f"⚠️  AI services initialization warning: {e}")
+            print(f"Warning AI services initialization warning: {e}")
     
     def get_status(self) -> Dict[str, Any]:
         """Get initialization status"""

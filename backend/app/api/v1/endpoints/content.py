@@ -134,7 +134,30 @@ async def get_course_content(
 ):
     """Get all content for a course"""
     try:
-        # TODO: Add proper access control - enrolled students should see course content
+        # Check if user is enrolled in the course or is the instructor
+        from app.services.enrollment_service import EnrollmentService
+        from app.services.course_service import CourseService
+
+        enrollment_service = EnrollmentService(db)
+        course_service = CourseService(db)
+
+        course = await course_service.get_course_by_id(course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+
+        # Allow access if user is the instructor or enrolled in the course
+        is_instructor = course.instructor_id == current_user.id
+        is_enrolled = await enrollment_service.get_enrollment(current_user.id, course_id) is not None
+
+        if not (is_instructor or is_enrolled):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You must be enrolled in this course or be the instructor"
+            )
+
         content_list = await content_service.get_course_content(course_id, content_type)
 
         return {
@@ -143,6 +166,8 @@ async def get_course_content(
             "total": len(content_list)
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -190,7 +215,30 @@ async def stream_course_content(
 ):
     """Stream course content (enrolled students only)"""
     try:
-        # TODO: Add enrollment check
+        # Check if user is enrolled in the course or is the instructor
+        from app.services.enrollment_service import EnrollmentService
+        from app.services.course_service import CourseService
+
+        enrollment_service = EnrollmentService(db)
+        course_service = CourseService(db)
+
+        course = await course_service.get_course_by_id(course_id)
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+
+        # Allow access if user is the instructor or enrolled in the course
+        is_instructor = course.instructor_id == current_user.id
+        is_enrolled = await enrollment_service.get_enrollment(current_user.id, course_id) is not None
+
+        if not (is_instructor or is_enrolled):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: You must be enrolled in this course or be the instructor"
+            )
+
         file_path = f"courses/{course_id}/{content_type}/{filename}"
 
         # Check if file exists
@@ -287,8 +335,37 @@ async def get_content_metadata(
 ):
     """Get metadata for content file"""
     try:
-        # TODO: Add access control
-        # For now, just return basic info
+        # Parse course_id from file path (assuming format: courses/{course_id}/...)
+        path_parts = file_path.split('/')
+        if len(path_parts) >= 2 and path_parts[0] == 'courses':
+            course_id = path_parts[1]
+
+            # Check if user has access to this course
+            from app.services.enrollment_service import EnrollmentService
+            from app.services.course_service import CourseService
+
+            enrollment_service = EnrollmentService(db)
+            course_service = CourseService(db)
+
+            course = await course_service.get_course_by_id(course_id)
+            if course:
+                # Allow access if user is the instructor or enrolled in the course
+                is_instructor = course.instructor_id == current_user.id
+                is_enrolled = await enrollment_service.get_enrollment(current_user.id, course_id) is not None
+
+                if not (is_instructor or is_enrolled):
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail="Access denied: You must be enrolled in this course or be the instructor"
+                    )
+        else:
+            # For non-course content, require admin access
+            if not getattr(current_user, 'is_admin', False):
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Access denied: Admin privileges required"
+                )
+
         exists = await content_service._storage_service.file_exists(file_path)
 
         if not exists:
@@ -330,19 +407,57 @@ async def process_course_content(
 ):
     """Process uploaded content (generate thumbnails, transcode videos, etc.)"""
     try:
-        # TODO: Implement content processing pipeline
-        # This would trigger background jobs for:
-        # - Video transcoding to multiple formats
-        # - Thumbnail generation
-        # - Content analysis and tagging
-        # - Metadata extraction
+        # Check if user is the instructor of the course
+        from app.services.course_service import CourseService
+        course_service = CourseService(db)
+        course = await course_service.get_course_by_id(course_id)
+
+        if not course:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Course not found"
+            )
+
+        if course.instructor_id != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to process content for this course"
+            )
+
+        # Get all content for the course and content type
+        content_list = await content_service.get_course_content(course_id, content_type)
+
+        if not content_list:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No {content_type} content found for this course"
+            )
+
+        # Process content based on type
+        processing_results = []
+        for content_item in content_list:
+            result = await content_service.process_content_item(
+                course_id=course_id,
+                content_path=content_item["path"],
+                content_type=content_type,
+                instructor_id=current_user.id
+            )
+            processing_results.append(result)
+
+        # Update course with processed content URLs if videos
+        if content_type == "videos":
+            await content_service.update_course_video_urls(course_id, processing_results)
 
         return {
-            "message": f"Content processing started for course {course_id}",
+            "message": f"Content processing completed for course {course_id}",
             "content_type": content_type,
-            "status": "processing"
+            "processed_items": len(processing_results),
+            "results": processing_results,
+            "status": "completed"
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

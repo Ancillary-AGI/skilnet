@@ -7,6 +7,7 @@ from importlib.util import find_spec
 from typing import AsyncGenerator, Dict, Any, Optional, Union
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import text
 
 from .database_config import (
     Base, async_engine, AsyncSessionLocal, get_db, create_tables, drop_tables,
@@ -136,7 +137,7 @@ __all__ = [
 # Database utilities
 async def init_database():
     """Initialize database with tables"""
-    print(f"🗄️  Initializing {db_config.DB_TYPE.value} database...")
+    print(f"Initializing {db_config.DB_TYPE.value} database...")
     
     if db_config.DB_TYPE == DatabaseType.MONGODB:
         # MongoDB doesn't use SQLAlchemy tables
@@ -145,7 +146,7 @@ async def init_database():
     
     try:
         await create_tables()
-        print("✅ Database tables created successfully")
+        print("Database tables created successfully")
     except Exception as e:
         print(f"❌ Database initialization failed: {e}")
         raise
@@ -154,16 +155,18 @@ async def check_database_connection():
     """Check if database connection is working"""
     try:
         async with AsyncSessionLocal() as session:
-            if db_config.DB_TYPE == DatabaseType.SQLITE:
-                await session.execute("SELECT 1")
-            elif db_config.DB_TYPE == DatabaseType.POSTGRESQL:
-                await session.execute("SELECT version()")
-            elif db_config.DB_TYPE == DatabaseType.MYSQL:
-                await session.execute("SELECT VERSION()")
-            
+            # Use connection directly for raw SQL
+            async with async_engine.connect() as conn:
+                if db_config.DB_TYPE == DatabaseType.SQLITE:
+                    await conn.execute(text("SELECT 1"))
+                elif db_config.DB_TYPE == DatabaseType.POSTGRESQL:
+                    await conn.execute(text("SELECT version()"))
+                elif db_config.DB_TYPE == DatabaseType.MYSQL:
+                    await conn.execute(text("SELECT VERSION()"))
+
         return True
     except Exception as e:
-        print(f"❌ Database connection failed: {e}")
+        print(f"Database connection failed: {e}")
         return False
 
 def get_database_info():
@@ -175,9 +178,15 @@ def get_database_info():
         "ssl_enabled": db_config.DB_SSL_MODE != "disable"
     }
 
-# MongoDB support (if needed)
-from motor.motor_asyncio import AsyncIOMotorClient
-from pymongo.errors import ConnectionFailure
+# MongoDB support (if needed) - imported conditionally
+try:
+    from motor.motor_asyncio import AsyncIOMotorClient
+    from pymongo.errors import ConnectionFailure
+    MONGODB_AVAILABLE = True
+except ImportError:
+    MONGODB_AVAILABLE = False
+    AsyncIOMotorClient = None
+    ConnectionFailure = None
 
 class MongoDatabase:
     def __init__(self):
@@ -187,9 +196,11 @@ class MongoDatabase:
     async def connect(self):
         """Connect to MongoDB"""
         if db_config.DB_TYPE == DatabaseType.MONGODB:
+            if not MONGODB_AVAILABLE:
+                raise ImportError("MongoDB dependencies not installed. Install motor and pymongo.")
             self.client = AsyncIOMotorClient(db_config.get_database_url())
             self.database = self.client[db_config.MONGODB_DB]
-            
+
             # Test connection
             await self.client.admin.command('ping')
             print("✅ MongoDB connected successfully")

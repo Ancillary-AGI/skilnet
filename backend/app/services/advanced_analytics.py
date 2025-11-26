@@ -69,6 +69,71 @@ class PredictiveModel:
     parameters: Dict[str, Any]
 
 
+class AdvancedAnalyticsService:
+    """Service wrapper for Advanced Analytics Engine"""
+
+    def __init__(self):
+        self.engine = AdvancedAnalyticsEngine()
+
+    async def initialize(self):
+        """Initialize the analytics service"""
+        await self.engine.initialize()
+
+    async def record_metrics(self, user_id: str, course_id: str, topic_id: str, metrics: Dict[str, float], metadata: Optional[Dict[str, Any]] = None):
+        """Record learning metrics"""
+        await self.engine.record_metrics(user_id, course_id, topic_id, metrics, metadata)
+
+    async def generate_insights(self, user_id: str, course_id: str, analysis_depth: str = "medium") -> List[AnalyticsInsight]:
+        """Generate insights"""
+        return await self.engine.generate_insights(user_id, course_id, analysis_depth)
+
+    async def predict_learning_outcomes(self, user_id: str, course_id: str, prediction_horizon_days: int = 30) -> Dict[str, Any]:
+        """Predict learning outcomes"""
+        return await self.engine.predict_learning_outcomes(user_id, course_id, prediction_horizon_days)
+
+    async def generate_comparative_analysis(self, user_id: str, course_id: str, comparison_group: str = "course_average") -> Dict[str, Any]:
+        """Generate comparative analysis"""
+        return await self.engine.generate_comparative_analysis(user_id, course_id, comparison_group)
+
+    async def detect_learning_patterns(self, user_id: str, course_id: str, pattern_types: List[str] = None) -> Dict[str, Any]:
+        """Detect learning patterns"""
+        return await self.engine.detect_learning_patterns(user_id, course_id, pattern_types)
+
+    async def generate_early_warning_alerts(self, user_id: str, course_id: str) -> List[Dict[str, Any]]:
+        """Generate early warning alerts"""
+        return await self.engine.generate_early_warning_alerts(user_id, course_id)
+
+    async def generate_learning_dashboard(self, user_id: str, course_id: str, dashboard_type: str = "comprehensive") -> Dict[str, Any]:
+        """Generate learning dashboard"""
+        return await self.engine.generate_learning_dashboard(user_id, course_id, dashboard_type)
+
+    async def get_analytics_report(self, user_id: str, course_id: str, report_type: str = "comprehensive", date_range_days: int = 30) -> Dict[str, Any]:
+        """Generate analytics report"""
+        return await self.engine.get_analytics_report(user_id, course_id, report_type, date_range_days)
+
+    async def get_user_performance_history(self, user_id: str) -> List[Dict[str, Any]]:
+        """Get user performance history"""
+        # Mock implementation - in production would query database
+        return [
+            {"course_id": "sample_course", "score": 85, "completed": True, "date": "2024-01-01"},
+            {"course_id": "sample_course2", "score": 90, "completed": True, "date": "2024-02-01"}
+        ]
+
+    async def get_course_completion_analytics(self, course_id: str) -> Dict[str, Any]:
+        """Get course completion analytics"""
+        # Mock implementation
+        return {
+            "completion_rate": 0.75,
+            "average_score": 82.5,
+            "total_enrollments": 1000,
+            "total_completions": 750
+        }
+
+    async def cleanup(self):
+        """Cleanup resources"""
+        await self.engine.cleanup()
+
+
 class AdvancedAnalyticsEngine:
     """
     Advanced analytics system that surpasses basic learning dashboards

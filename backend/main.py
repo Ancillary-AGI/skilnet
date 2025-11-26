@@ -27,14 +27,14 @@ security = HTTPBearer()
 async def lifespan(app: FastAPI):
     """Application lifespan manager"""
     # Startup
-    print("🚀 Starting EduVerse API...")
+    print("Starting EduVerse API...")
 
     try:
         # Initialize all systems
         init_status = await startup_initialization()
-        print(f"📊 Initialization Status: {init_status['status']}")
+        print(f"Initialization Status: {init_status['status']}")
     except Exception as e:
-        print(f"❌ Critical startup error: {e}")
+        print(f"Critical startup error: {e}")
         raise
 
     yield

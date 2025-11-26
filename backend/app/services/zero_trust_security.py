@@ -6,7 +6,7 @@ Superior to basic authentication with comprehensive threat protection and compli
 import asyncio
 import logging
 from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import uuid
 import hashlib
 import json
@@ -66,7 +66,7 @@ class SecurityEvent:
     action: str
     risk_level: RiskLevel
     details: Dict[str, Any]
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     resolved: bool = False
 
 
@@ -78,8 +78,8 @@ class SecurityPolicy:
     description: str
     rules: List[Dict[str, Any]]
     is_active: bool = True
-    created_at: datetime = field(default_factory=datetime.utcnow)
-    updated_at: datetime = field(default_factory=datetime.utcnow)
+    created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
 
 
 @dataclass
@@ -93,7 +93,7 @@ class UserSecurityContext:
     risk_score: float
     trust_level: str
     mfa_verified: bool = False
-    last_activity: datetime = field(default_factory=datetime.utcnow)
+    last_activity: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     suspicious_activities: List[Dict[str, Any]] = field(default_factory=list)
 
 
@@ -133,7 +133,7 @@ class ZeroTrustSecurityEngine:
         self.fernet = Fernet(self.encryption_key)
 
         # Password hashing
-        self.pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+        self.pwd_context = CryptContext(schemes=["bcrypt"])
 
         # Threat detection models
         self.anomaly_detectors = {}
@@ -440,7 +440,7 @@ class ZeroTrustSecurityEngine:
     ) -> Dict[str, Any]:
         """Generate comprehensive security report"""
 
-        cutoff_time = datetime.utcnow() - timedelta(hours=time_range_hours)
+        cutoff_time = datetime.now(timezone.utc) - timedelta(hours=time_range_hours)
 
         # Filter recent events
         recent_events = [

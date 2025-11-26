@@ -13,7 +13,8 @@ from app.core.logging import get_logger, log_performance
 from app.models.course import Course
 from app.models.category import Category
 from app.models.user import User
-from app.schemas.course import CourseCreate, CourseUpdate, CourseFilter
+from app.models.course_rating import CourseRating
+from app.schemas.course import CourseCreate, CourseUpdate, CourseFilter, CourseRatingCreate, CourseRatingUpdate
 
 
 class CourseService:
@@ -346,24 +347,151 @@ class CourseService:
             self.logger.error(f"Failed to increment enrollment count: {e}")
 
     @log_performance
-    async def update_course_rating(self, course_id: str, new_rating: float) -> None:
-        """Update course average rating"""
+    async def create_or_update_rating(self, user_id: str, course_id: str, rating_data: CourseRatingCreate) -> CourseRating:
+        """Create or update a course rating"""
         try:
-            # Get current course data
-            course = await self.get_course_by_id(course_id)
-            if not course:
-                return
+            # Check if rating already exists
+            existing_rating = await self.get_user_rating_for_course(user_id, course_id)
 
-            # Calculate new average rating
-            total_ratings = course.total_ratings + 1
-            current_total = course.average_rating * course.total_ratings
-            new_average = (current_total + new_rating) / total_ratings
+            if existing_rating:
+                # Update existing rating
+                existing_rating.rating = rating_data.rating
+                existing_rating.review_text = rating_data.review_text
+                existing_rating.updated_at = func.now()
+
+                await self.db.commit()
+                await self.db.refresh(existing_rating)
+
+                self.logger.info(f"Updated rating for course {course_id} by user {user_id}")
+                rating = existing_rating
+            else:
+                # Create new rating
+                rating = CourseRating(
+                    id=str(uuid.uuid4()),
+                    user_id=user_id,
+                    course_id=course_id,
+                    rating=rating_data.rating,
+                    review_text=rating_data.review_text
+                )
+
+                self.db.add(rating)
+                await self.db.commit()
+                await self.db.refresh(rating)
+
+                self.logger.info(f"Created rating for course {course_id} by user {user_id}")
+
+            # Update course average rating
+            await self._update_course_average_rating(course_id)
+
+            return rating
+
+        except Exception as e:
+            await self.db.rollback()
+            self.logger.error(f"Failed to create/update rating: {e}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Rating operation failed: {str(e)}"
+            )
+
+    @log_performance
+    async def get_user_rating_for_course(self, user_id: str, course_id: str) -> Optional[CourseRating]:
+        """Get user's rating for a specific course"""
+        try:
+            result = await self.db.execute(
+                select(CourseRating)
+                .options(selectinload(CourseRating.user))
+                .where(
+                    and_(
+                        CourseRating.user_id == user_id,
+                        CourseRating.course_id == course_id
+                    )
+                )
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Error getting user rating: {e}")
+            return None
+
+    @log_performance
+    async def get_course_ratings(self, course_id: str, skip: int = 0, limit: int = 50) -> Dict[str, Any]:
+        """Get all ratings for a course"""
+        try:
+            query = select(CourseRating).options(
+                selectinload(CourseRating.user)
+            ).where(CourseRating.course_id == course_id)
+
+            # Get total count
+            count_query = select(func.count()).select_from(query.subquery())
+            total_result = await self.db.execute(count_query)
+            total = total_result.scalar()
+
+            # Apply pagination and ordering
+            query = query.order_by(CourseRating.created_at.desc())
+            query = query.offset(skip).limit(limit)
+
+            result = await self.db.execute(query)
+            ratings = result.scalars().all()
+
+            return {
+                "ratings": ratings,
+                "total": total,
+                "skip": skip,
+                "limit": limit
+            }
+
+        except Exception as e:
+            self.logger.error(f"Error getting course ratings: {e}")
+            return {
+                "ratings": [],
+                "total": 0,
+                "skip": skip,
+                "limit": limit
+            }
+
+    @log_performance
+    async def delete_rating(self, user_id: str, course_id: str) -> bool:
+        """Delete a user's rating for a course"""
+        try:
+            rating = await self.get_user_rating_for_course(user_id, course_id)
+            if not rating:
+                return False
+
+            await self.db.execute(
+                delete(CourseRating).where(CourseRating.id == rating.id)
+            )
+            await self.db.commit()
+
+            # Update course average rating
+            await self._update_course_average_rating(course_id)
+
+            self.logger.info(f"Deleted rating for course {course_id} by user {user_id}")
+            return True
+
+        except Exception as e:
+            await self.db.rollback()
+            self.logger.error(f"Failed to delete rating: {e}")
+            return False
+
+    async def _update_course_average_rating(self, course_id: str) -> None:
+        """Update course average rating based on all ratings"""
+        try:
+            # Calculate new average from all ratings
+            result = await self.db.execute(
+                select(
+                    func.avg(CourseRating.rating).label('avg_rating'),
+                    func.count(CourseRating.id).label('total_ratings')
+                ).where(CourseRating.course_id == course_id)
+            )
+
+            stats = result.first()
+            avg_rating = stats.avg_rating or 0.0
+            total_ratings = stats.total_ratings or 0
 
             await self.db.execute(
                 update(Course)
                 .where(Course.id == course_id)
                 .values(
-                    average_rating=new_average,
+                    average_rating=round(avg_rating, 2),
                     total_ratings=total_ratings
                 )
             )
@@ -371,7 +499,7 @@ class CourseService:
 
         except Exception as e:
             await self.db.rollback()
-            self.logger.error(f"Failed to update course rating: {e}")
+            self.logger.error(f"Failed to update course average rating: {e}")
 
     def _generate_slug(self, title: str) -> str:
         """Generate URL-friendly slug from title"""

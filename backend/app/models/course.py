@@ -35,6 +35,7 @@ class Course(Base):
 
     # Relationships
     enrollments = relationship("Enrollment", back_populates="course")
+    ratings = relationship("CourseRating", back_populates="course")
 
     # Pricing
     price = Column(Float, default=0.0)
@@ -59,6 +60,9 @@ class Course(Base):
     # AI features
     ai_generated_content = Column(Boolean, default=False)
     personalization_enabled = Column(Boolean, default=True)
+
+    # Processed content URLs
+    video_content = Column(JSON, nullable=True)  # Store processed video URLs and metadata
     
     # Statistics
     enrollment_count = Column(Integer, default=0)

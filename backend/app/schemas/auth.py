@@ -2,7 +2,7 @@
 Authentication schemas for EduVerse platform
 """
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field
 from typing import Optional, Dict, Any, List
 from datetime import datetime
 from enum import Enum
@@ -17,7 +17,7 @@ class SocialProvider(str, Enum):
 
 class UserBase(BaseModel):
     """Base user schema"""
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")
     username: str = Field(..., min_length=3, max_length=50, description="Username")
     full_name: str = Field(..., min_length=1, max_length=100, description="Full name")
     is_instructor: bool = Field(False, description="Whether user is an instructor")
@@ -25,7 +25,7 @@ class UserBase(BaseModel):
 
 class UserCreate(BaseModel):
     """Schema for creating a new user"""
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")
     username: str = Field(..., min_length=3, max_length=50, description="Username")
     full_name: str = Field(..., min_length=1, max_length=100, description="Full name")
     password: str = Field(..., min_length=8, description="User password")
@@ -33,7 +33,7 @@ class UserCreate(BaseModel):
 
 class UserUpdate(BaseModel):
     """Schema for updating user information"""
-    email: Optional[EmailStr] = Field(None, description="User email address")
+    email: Optional[str] = Field(None, description="User email address")
     username: Optional[str] = Field(None, min_length=3, max_length=50, description="Username")
     full_name: Optional[str] = Field(None, min_length=1, max_length=100, description="Full name")
     is_instructor: Optional[bool] = Field(None, description="Whether user is an instructor")
@@ -64,10 +64,8 @@ class UserProfileResponse(UserResponse):
 
 class LoginRequest(BaseModel):
     """Login request schema"""
-    email: EmailStr = Field(..., description="User email")
+    email: str = Field(..., description="User email")
     password: str = Field(..., description="User password")
-
-
 
 
 class TokenResponse(BaseModel):
@@ -86,7 +84,7 @@ class RefreshTokenRequest(BaseModel):
 
 class PasswordResetRequest(BaseModel):
     """Password reset request schema"""
-    email: EmailStr = Field(..., description="User email address")
+    email: str = Field(..., description="User email address")
 
 
 class PasswordResetConfirm(BaseModel):
@@ -103,7 +101,7 @@ class ChangePasswordRequest(BaseModel):
 
 class EmailVerificationRequest(BaseModel):
     """Email verification request schema"""
-    email: EmailStr = Field(..., description="Email to verify")
+    email: str = Field(..., description="Email to verify")
 
 
 class EmailVerificationConfirm(BaseModel):
@@ -174,7 +172,7 @@ class PasskeyRegistrationConfirm(BaseModel):
 
 class PasskeyAuthenticationRequest(BaseModel):
     """Passkey authentication request schema"""
-    email: EmailStr = Field(..., description="User email")
+    email: str = Field(..., description="User email")
 
 
 class PasskeyAuthenticationChallenge(BaseModel):
